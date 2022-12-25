@@ -71,8 +71,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.registerHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.retrieveHistory;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -381,13 +381,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
         // history instance name to initialize FlinkDatabaseHistory
         properties.setProperty(
-                FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
+                FlinkDatabaseHistory.SCHEMA_HISTORY_INTERNAL_NAME, engineInstanceName);
+
         // we have to use a persisted DatabaseHistory implementation, otherwise, recovery can't
         // continue to read binlog
         // see
         // https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
-        properties.setProperty("database.history", determineDatabase().getCanonicalName());
+        properties.setProperty("schema.history.internal", determineDatabase().getCanonicalName());
 
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =

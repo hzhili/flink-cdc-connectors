@@ -14,26 +14,20 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.debezium.task.context;
+package io.debezium.connector.mysql;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
+import com.ververica.cdc.connectors.mysql.debezium.task.context.MySqlErrorHandler;
+import com.ververica.cdc.connectors.mysql.debezium.task.context.MySqlTaskContextImpl;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.MySqlChangeEventSourceMetricsFactory;
-import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlConnectorConfig;
-import io.debezium.connector.mysql.MySqlDatabaseSchema;
-import io.debezium.connector.mysql.MySqlOffsetContext;
-import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
-import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -42,9 +36,10 @@ import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
 import io.debezium.util.SchemaNameAdjuster;
@@ -58,6 +53,7 @@ import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.DATABASE_NAME;
 
 /**
  * A stateful task context that contains entries the debezium mysql connector task required.
@@ -80,10 +76,11 @@ public class StatefulTaskContext {
 
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
+    private Offsets<MySqlPartition, MySqlOffsetContext> offsets;
     private MySqlOffsetContext offsetContext;
-    private TopicSelector<TableId> topicSelector;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
-    private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+    private TopicNamingStrategy<TableId> topicNamingStrategy;
+    private MySqlSnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
+    private MySqlStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
     private EventDispatcher.SnapshotReceiver snapshotReceiver;
     private SignalEventDispatcher signalEventDispatcher;
@@ -105,7 +102,8 @@ public class StatefulTaskContext {
     public void configure(MySqlSplit mySqlSplit) {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
-        this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
+        this.topicNamingStrategy =
+                connectorConfig.getTopicNamingStrategy(MySqlConnectorConfig.TOPIC_NAMING_STRATEGY);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
@@ -113,9 +111,9 @@ public class StatefulTaskContext {
                 mySqlSplit.getTableSchemas().values());
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
-        this.offsetContext =
+        this.offsets =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
+        validateAndLoadDatabaseHistory(offsets, databaseSchema);
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
@@ -140,7 +138,7 @@ public class StatefulTaskContext {
         this.dispatcher =
                 new EventDispatcherImpl<>(
                         connectorConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),
@@ -152,31 +150,33 @@ public class StatefulTaskContext {
 
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
-                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
+                        offsets.getTheOnlyPartition().getSourcePartition(),
+                        topicNamingStrategy.heartbeatTopic(),
+                        queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
                         new MySqlStreamingChangeEventSourceMetrics(
                                 taskContext, queue, metadataProvider));
         this.snapshotChangeEventSourceMetrics =
-                changeEventSourceMetricsFactory.getSnapshotMetrics(
-                        taskContext, queue, metadataProvider);
+                (MySqlSnapshotChangeEventSourceMetrics)
+                        changeEventSourceMetricsFactory.getSnapshotMetrics(
+                                taskContext, queue, metadataProvider);
         this.streamingChangeEventSourceMetrics =
-                changeEventSourceMetricsFactory.getStreamingMetrics(
-                        taskContext, queue, metadataProvider);
+                (MySqlStreamingChangeEventSourceMetrics)
+                        changeEventSourceMetricsFactory.getStreamingMetrics(
+                                taskContext, queue, metadataProvider);
         this.errorHandler =
-                new MySqlErrorHandler(
-                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
+                new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
     }
 
-    private void validateAndLoadDatabaseHistory(
-            MySqlOffsetContext offset, MySqlDatabaseSchema schema) {
+    private void validateAndLoadDatabaseHistory(Offsets offsets, MySqlDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(offset);
+        schema.recover(offsets);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private MySqlOffsetContext loadStartingOffsetState(
+    private Offsets<MySqlPartition, MySqlOffsetContext> loadStartingOffsetState(
             OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()
@@ -195,7 +195,11 @@ public class StatefulTaskContext {
                             + ", but this is no longer "
                             + "available on the server. Reconfigure the connector to use a snapshot when needed.");
         }
-        return mySqlOffsetContext;
+        MySqlPartition partition =
+                new MySqlPartition(
+                        connectorConfig.getLogicalName(),
+                        sourceConfig.getDbzConfiguration().getString(DATABASE_NAME.name()));
+        return Offsets.of(partition, mySqlOffsetContext);
     }
 
     private boolean isBinlogAvailable(MySqlOffsetContext offset) {
@@ -376,11 +380,19 @@ public class StatefulTaskContext {
     }
 
     public MySqlOffsetContext getOffsetContext() {
-        return offsetContext;
+        return offsets.getTheOnlyOffset();
     }
 
-    public TopicSelector<TableId> getTopicSelector() {
-        return topicSelector;
+    public Offsets<MySqlPartition, MySqlOffsetContext> getOffsets() {
+        return offsets;
+    }
+
+    public MySqlPartition getPartition() {
+        return offsets.getTheOnlyPartition();
+    }
+
+    public TopicNamingStrategy<TableId> getTopicNamingStrategy() {
+        return topicNamingStrategy;
     }
 
     public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {

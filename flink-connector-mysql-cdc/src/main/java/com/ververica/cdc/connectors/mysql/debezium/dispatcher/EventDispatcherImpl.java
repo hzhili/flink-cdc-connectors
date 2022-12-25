@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.debezium.dispatcher;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
@@ -26,11 +27,11 @@ import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.schema.DataCollectionFilters;
-import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -40,13 +41,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_POSITION_OFFSET_KEY;
-import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.MySqlEventMetadataProvider.SERVER_ID_KEY;
+import static io.debezium.connector.mysql.StatefulTaskContext.MySqlEventMetadataProvider.SERVER_ID_KEY;
 
 /**
  * A subclass implementation of {@link EventDispatcher}.
@@ -57,7 +59,8 @@ import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulT
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispatcher<T> {
+public class EventDispatcherImpl<T extends DataCollectionId>
+        extends EventDispatcher<MySqlPartition, T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventDispatcherImpl.class);
 
@@ -68,13 +71,13 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
     private final HistorizedDatabaseSchema historizedSchema;
     private final DataCollectionFilters.DataCollectionFilter<T> filter;
     private final CommonConnectorConfig connectorConfig;
-    private final TopicSelector<T> topicSelector;
+    private final TopicNamingStrategy<T> topicNamingStrategy;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
 
     public EventDispatcherImpl(
             CommonConnectorConfig connectorConfig,
-            TopicSelector<T> topicSelector,
+            TopicNamingStrategy<T> topicNamingStrategy,
             DatabaseSchema<T> schema,
             ChangeEventQueue<DataChangeEvent> queue,
             DataCollectionFilters.DataCollectionFilter<T> filter,
@@ -83,7 +86,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
             SchemaNameAdjuster schemaNameAdjuster) {
         super(
                 connectorConfig,
-                topicSelector,
+                topicNamingStrategy,
                 schema,
                 queue,
                 filter,
@@ -97,7 +100,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
         this.filter = filter;
         this.queue = queue;
         this.connectorConfig = connectorConfig;
-        this.topicSelector = topicSelector;
+        this.topicNamingStrategy = topicNamingStrategy;
         this.schemaChangeKeySchema =
                 SchemaBuilder.struct()
                         .name(
@@ -127,7 +130,9 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
 
     @Override
     public void dispatchSchemaChangeEvent(
-            T dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
+            MySqlPartition partition,
+            T dataCollectionId,
+            SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
             if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
@@ -188,7 +193,8 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
                             event.getDatabase(),
                             null,
                             event.getDdl(),
-                            event.getTableChanges());
+                            event.getTableChanges(),
+                            Instant.now());
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
 
             Struct value = new Struct(schemaChangeValueSchema);
@@ -202,7 +208,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
-                    final String topicName = topicSelector.getPrimaryTopic();
+                    final String topicName = topicNamingStrategy.schemaChangeTopic();
                     final Integer partition = 0;
                     final Struct key = schemaChangeRecordKey(event);
                     final Struct value = schemaChangeRecordValue(event);

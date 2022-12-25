@@ -17,8 +17,8 @@
 package com.ververica.cdc.connectors.mysql.source.offset;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.StatefulTaskContext;
 
 /** Utils for handling {@link BinlogOffset}. */
 public class BinlogOffsetUtils {

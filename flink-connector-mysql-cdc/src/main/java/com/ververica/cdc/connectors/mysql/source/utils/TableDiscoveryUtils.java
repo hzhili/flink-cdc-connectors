@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.DATABASE_NAME;
 
 /** Utilities to discovery matched tables. */
 public class TableDiscoveryUtils {
@@ -109,7 +111,13 @@ public class TableDiscoveryUtils {
         }
 
         // fetch table schemas
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive());
+        MySqlSchema mySqlSchema =
+                new MySqlSchema(
+                        new MySqlPartition(
+                                sourceConfig.getMySqlConnectorConfig().getLogicalName(),
+                                sourceConfig.getDbzConfiguration().getString(DATABASE_NAME.name())),
+                        sourceConfig,
+                        jdbc.isTableIdCaseSensitive());
         Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         for (TableId tableId : capturedTableIds) {
             TableChanges.TableChange tableSchema = mySqlSchema.getTableSchema(jdbc, tableId);

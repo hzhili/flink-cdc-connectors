@@ -153,6 +153,12 @@ under the License.
             <version>2.4.0</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.tikv</groupId>
+            <artifactId>tikv-client-java</artifactId>
+            <version>3.2.0</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 

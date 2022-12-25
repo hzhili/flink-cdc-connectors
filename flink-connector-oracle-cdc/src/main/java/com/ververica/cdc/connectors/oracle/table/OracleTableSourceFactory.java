@@ -71,7 +71,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String hostname = config.get(HOSTNAME);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
-        String databaseName = config.get(DATABASE_NAME);
+        String databaseName = config.get(DATABASE_NAME).toUpperCase();
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);

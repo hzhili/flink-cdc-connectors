@@ -24,7 +24,6 @@ import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadF
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlSnapshotSplitReadTask;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -36,6 +35,7 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.connector.mysql.StatefulTaskContext;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -115,7 +115,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
                         statefulTaskContext.getDispatcher(),
-                        statefulTaskContext.getTopicSelector(),
+                        statefulTaskContext.getTopicNamingStrategy(),
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit);
@@ -128,7 +128,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                 new SnapshotSplitChangeEventSourceContextImpl();
                         SnapshotResult snapshotResult =
                                 splitSnapshotReadTask.execute(
-                                        sourceContext, statefulTaskContext.getOffsetContext());
+                                        sourceContext,
+                                        statefulTaskContext.getPartition(),
+                                        statefulTaskContext.getOffsetContext());
 
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
@@ -157,6 +159,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
                             backfillBinlogReadTask.execute(
                                     new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                                    statefulTaskContext.getPartition(),
                                     mySqlOffsetContext);
                         } else {
                             readException =
@@ -220,8 +223,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             throws InterruptedException {
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
-                        statefulTaskContext.getOffsetContext().getPartition(),
-                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
+                        statefulTaskContext.getPartition().getSourcePartition(),
+                        statefulTaskContext.getTopicNamingStrategy().heartbeatTopic(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 backFillBinlogSplit,

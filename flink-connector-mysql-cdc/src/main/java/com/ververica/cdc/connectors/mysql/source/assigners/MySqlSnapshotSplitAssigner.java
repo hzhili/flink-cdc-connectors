@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -59,6 +60,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbc
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
 import static com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.DATABASE_NAME;
 
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
@@ -528,7 +530,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             boolean isTableIdCaseSensitive,
             ChunkSplitterState chunkSplitterState) {
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
+        MySqlSchema mySqlSchema =
+                new MySqlSchema(
+                        new MySqlPartition(
+                                sourceConfig.getMySqlConnectorConfig().getLogicalName(),
+                                sourceConfig.getDbzConfiguration().getString(DATABASE_NAME.name())),
+                        sourceConfig,
+                        isTableIdCaseSensitive);
         if (!NO_SPLITTING_TABLE_STATE.equals(chunkSplitterState)) {
             return new MySqlChunkSplitter(mySqlSchema, sourceConfig, chunkSplitterState);
         }

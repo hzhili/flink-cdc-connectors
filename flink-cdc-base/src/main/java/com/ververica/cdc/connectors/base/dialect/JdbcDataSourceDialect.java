@@ -26,6 +26,7 @@ import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoo
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -54,8 +55,10 @@ public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfi
     default JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
         JdbcConnection jdbc =
                 new JdbcConnection(
-                        sourceConfig.getDbzConfiguration(),
-                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()));
+                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
+                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
+                        null,
+                        null);
         try {
             jdbc.connect();
         } catch (Exception e) {

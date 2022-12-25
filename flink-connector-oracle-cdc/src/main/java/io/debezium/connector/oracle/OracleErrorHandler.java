@@ -16,6 +16,7 @@
 
 package io.debezium.connector.oracle;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.ErrorHandler;
 
@@ -60,8 +61,8 @@ public class OracleErrorHandler extends ErrorHandler {
         retryOracleMessageContainsTexts.add("No more data to read from socket");
     }
 
-    public OracleErrorHandler(String logicalName, ChangeEventQueue<?> queue) {
-        super(OracleConnector.class, logicalName, queue);
+    public OracleErrorHandler(CommonConnectorConfig connectorConfig, ChangeEventQueue<?> queue) {
+        super(OracleConnector.class, connectorConfig, queue);
     }
 
     @Override

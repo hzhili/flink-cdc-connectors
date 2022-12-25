@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -46,8 +47,13 @@ public class MySqlSchema {
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
+    private final MySqlPartition partition;
 
-    public MySqlSchema(MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
+    public MySqlSchema(
+            MySqlPartition partition,
+            MySqlSourceConfig sourceConfig,
+            boolean isTableIdCaseSensitive) {
+        this.partition = partition;
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
         this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, isTableIdCaseSensitive);
         this.schemasByTableId = new HashMap<>();
@@ -113,7 +119,7 @@ public class MySqlSchema {
         final MySqlOffsetContext offsetContext = MySqlOffsetContext.initial(connectorConfig);
         List<SchemaChangeEvent> schemaChangeEvents =
                 databaseSchema.parseSnapshotDdl(
-                        ddl, tableId.catalog(), offsetContext, Instant.now());
+                        partition, ddl, tableId.catalog(), offsetContext, Instant.now());
         for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
             for (TableChange tableChange : schemaChangeEvent.getTableChanges()) {
                 tableChangeMap.put(tableId, tableChange);

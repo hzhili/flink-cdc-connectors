@@ -158,11 +158,14 @@ public class OracleSource {
             if (port != null) {
                 props.setProperty("database.port", String.valueOf(port));
             }
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+            props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
-            if (schemaList != null) {
-                props.setProperty("schema.whitelist", String.join(",", schemaList));
-            }
+            props.setProperty(
+                    "topic.prefix",
+                    DATABASE_SERVER_NAME + "." + database + "." + schemaList + "." + tableList);
+            //            if (schemaList != null) {
+            //                props.setProperty("schema.whitelist", String.join(",", schemaList));
+            //            }
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }

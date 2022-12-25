@@ -70,17 +70,25 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.server.name", DATABASE_SERVER_NAME);
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
         // database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+                "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty("schema.history.internal.name", UUID.randomUUID() + "_" + subtaskId);
+        props.setProperty("schema.history.internal.prefer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
+        props.setProperty(
+                "topic.prefix",
+                DATABASE_SERVER_NAME
+                        + "."
+                        + databaseList.get(0)
+                        + "."
+                        + schemaList.get(0)
+                        + "."
+                        + tableList.get(0));
 
         if (url != null) {
             props.setProperty("database.url", url);
@@ -91,9 +99,9 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
             props.setProperty("database.port", String.valueOf(port));
         }
 
-        if (schemaList != null) {
-            props.setProperty("schema.whitelist", String.join(",", schemaList));
-        }
+        //        if (schemaList != null) {
+        //            props.setProperty("schema.whitelist", String.join(",", schemaList));
+        //        }
 
         if (tableList != null) {
             props.setProperty("table.include.list", String.join(",", tableList));

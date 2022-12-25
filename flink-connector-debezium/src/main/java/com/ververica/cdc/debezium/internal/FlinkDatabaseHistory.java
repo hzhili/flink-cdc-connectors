@@ -17,31 +17,31 @@
 package com.ververica.cdc.debezium.internal;
 
 import io.debezium.config.Configuration;
-import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.DatabaseHistoryException;
-import io.debezium.relational.history.DatabaseHistoryListener;
+import io.debezium.relational.history.AbstractSchemaHistory;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
+import io.debezium.relational.history.SchemaHistoryException;
+import io.debezium.relational.history.SchemaHistoryListener;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.registerHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.removeHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.retrieveHistory;
 
 /**
- * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store the
+ * Inspired from {@link io.debezium.relational.history.MemorySchemaHistory} but we will store the
  * HistoryRecords in Flink's state for persistence.
  *
  * <p>Note: This is not a clean solution because we depends on a global variable and all the history
  * records will be stored in state (grow infinitely). We may need to come up with a
  * FileSystemDatabaseHistory in the future to store history in HDFS.
  */
-public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
+public class FlinkDatabaseHistory extends AbstractSchemaHistory {
 
-    public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
+    public static final String SCHEMA_HISTORY_INTERNAL_NAME = "schema.history.internal.name";
 
     private ConcurrentLinkedQueue<SchemaRecord> schemaRecords;
     private String instanceName;
@@ -56,10 +56,10 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     public void configure(
             Configuration config,
             HistoryRecordComparator comparator,
-            DatabaseHistoryListener listener,
+            SchemaHistoryListener listener,
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
-        this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
+        this.instanceName = config.getString(SCHEMA_HISTORY_INTERNAL_NAME);
         this.schemaRecords = getRegisteredHistoryRecord(instanceName);
 
         // register the schema changes into state
@@ -74,7 +74,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     }
 
     @Override
-    protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
+    protected void storeRecord(HistoryRecord record) throws SchemaHistoryException {
         this.schemaRecords.add(new SchemaRecord(record));
     }
 

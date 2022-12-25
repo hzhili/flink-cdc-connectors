@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.Scn;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -51,8 +52,8 @@ public class OracleConnectionUtils {
     public static OracleConnection createOracleConnection(Configuration dbzConfiguration) {
         Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
         return new OracleConnection(
-                configuration.isEmpty() ? dbzConfiguration : configuration,
-                OracleConnectionUtils.class::getClassLoader);
+                JdbcConfiguration.adapt(configuration.isEmpty() ? dbzConfiguration : configuration),
+                true);
     }
 
     /** Fetch current redoLog offsets in Oracle Server. */
@@ -88,7 +89,9 @@ public class OracleConnectionUtils {
         Set<TableId> tableIdSet = new HashSet<>();
         String queryTablesSql =
                 "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
-                        + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX')";
+                        + "WHERE OWNER NOT IN ('SYSTEM','SYSAUX')";
+
+
         try {
             jdbcConnection.query(
                     queryTablesSql,
@@ -106,11 +109,13 @@ public class OracleConnectionUtils {
         }
 
         for (TableId tableId : tableIdSet) {
-            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-                capturedTableIds.add(tableId);
-                LOG.info("\t including '{}' for further processing", tableId);
-            } else {
-                LOG.debug("\t '{}' is filtered out of capturing", tableId);
+            if (tableId.table().equalsIgnoreCase("MZSF_CLININFO")) {
+                if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+                    capturedTableIds.add(tableId);
+                    LOG.info("\t including '{}' for further processing", tableId);
+                } else {
+                    LOG.debug("\t '{}' is filtered out of capturing", tableId);
+                }
             }
         }
 

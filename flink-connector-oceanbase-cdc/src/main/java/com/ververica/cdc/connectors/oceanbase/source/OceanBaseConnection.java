@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oceanbase.source;
 
 import io.debezium.config.Configuration;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.time.Duration;
@@ -35,12 +36,12 @@ public class OceanBaseConnection extends JdbcConnection {
             String password,
             Duration timeout,
             ClassLoader classLoader) {
-        super(config(hostname, port, user, password, timeout), factory(classLoader));
+        super(config(hostname, port, user, password, timeout), factory(classLoader),null,null);
     }
 
-    public static Configuration config(
+    public static JdbcConfiguration config(
             String hostname, Integer port, String user, String password, Duration timeout) {
-        return Configuration.create()
+        return JdbcConfiguration.create()
                 .with("hostname", hostname)
                 .with("port", port)
                 .with("user", user)

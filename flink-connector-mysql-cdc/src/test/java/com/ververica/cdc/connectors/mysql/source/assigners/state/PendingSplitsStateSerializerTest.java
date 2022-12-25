@@ -23,6 +23,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
+import io.debezium.relational.Attribute;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
@@ -253,6 +254,21 @@ public class PendingSplitsStateSerializerTest {
         @Override
         public String defaultCharsetName() {
             return "UTF-8";
+        }
+
+        @Override
+        public String comment() {
+            return null;
+        }
+
+        @Override
+        public List<Attribute> attributes() {
+            return null;
+        }
+
+        @Override
+        public Attribute attributeWithName(String name) {
+            return null;
         }
 
         @Override

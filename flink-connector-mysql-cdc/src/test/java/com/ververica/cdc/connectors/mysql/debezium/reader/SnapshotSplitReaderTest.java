@@ -23,7 +23,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -33,10 +32,12 @@ import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.StatefulTaskContext;
 import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DataCollectionSchema;
 import org.apache.kafka.connect.data.Struct;
@@ -500,6 +501,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
                 @Override
                 public void changeRecord(
+                        Partition partition,
                         DataCollectionSchema schema,
                         Envelope.Operation operation,
                         Object key,
@@ -507,7 +509,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         OffsetContext offset,
                         ConnectHeaders headers)
                         throws InterruptedException {
-                    snapshotReceiver.changeRecord(schema, operation, key, value, offset, headers);
+                    snapshotReceiver.changeRecord(
+                            partition, schema, operation, key, value, offset, headers);
                 }
 
                 @Override

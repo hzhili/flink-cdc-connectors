@@ -27,6 +27,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -34,7 +35,7 @@ import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -44,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,7 +59,7 @@ import java.util.Map;
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
+public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatcher<P, TableId> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceEventDispatcher.class);
 
     public static final String HISTORY_RECORD_FIELD = "historyRecord";
@@ -71,14 +73,14 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
     private final HistorizedDatabaseSchema historizedSchema;
     private final DataCollectionFilters.DataCollectionFilter<TableId> filter;
     private final CommonConnectorConfig connectorConfig;
-    private final TopicSelector<TableId> topicSelector;
+    private final TopicNamingStrategy<TableId> topicNamingStrategy;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
     private final String topic;
 
     public JdbcSourceEventDispatcher(
             CommonConnectorConfig connectorConfig,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicNamingStrategy,
             DatabaseSchema<TableId> schema,
             ChangeEventQueue<DataChangeEvent> queue,
             DataCollectionFilters.DataCollectionFilter<TableId> filter,
@@ -87,7 +89,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             SchemaNameAdjuster schemaNameAdjuster) {
         super(
                 connectorConfig,
-                topicSelector,
+                topicNamingStrategy,
                 schema,
                 queue,
                 filter,
@@ -101,8 +103,8 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
         this.filter = filter;
         this.queue = queue;
         this.connectorConfig = connectorConfig;
-        this.topicSelector = topicSelector;
-        this.topic = topicSelector.getPrimaryTopic();
+        this.topicNamingStrategy = topicNamingStrategy;
+        this.topic = topicNamingStrategy.schemaChangeTopic();
         this.schemaChangeKeySchema =
                 SchemaBuilder.struct()
                         .name(
@@ -132,7 +134,9 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
 
     @Override
     public void dispatchSchemaChangeEvent(
-            TableId dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
+            Partition partition,
+            TableId dataCollectionId,
+            SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
             if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
@@ -181,12 +185,12 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
         private Struct schemaChangeRecordValue(SchemaChangeEvent event) throws IOException {
             Struct sourceInfo = event.getSource();
             Map<String, Object> source = new HashMap<>();
-            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-            source.put(SERVER_ID_KEY, serverId);
-            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            //            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
+            //            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
+            //            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
+            //            source.put(SERVER_ID_KEY, serverId);
+            //            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
+            //            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
             HistoryRecord historyRecord =
                     new HistoryRecord(
                             source,
@@ -194,7 +198,8 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
                             event.getDatabase(),
                             null,
                             event.getDdl(),
-                            event.getTableChanges());
+                            event.getTableChanges(),
+                            Instant.now());
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
 
             Struct value = new Struct(schemaChangeValueSchema);
@@ -208,7 +213,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
-                    final String topicName = topicSelector.getPrimaryTopic();
+                    final String topicName = topicNamingStrategy.schemaChangeTopic();
                     final Integer partition = 0;
                     final Struct key = schemaChangeRecordKey(event);
                     final Struct value = schemaChangeRecordValue(event);

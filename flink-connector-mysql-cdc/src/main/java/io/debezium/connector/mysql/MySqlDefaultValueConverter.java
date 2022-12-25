@@ -427,8 +427,8 @@ public class MySqlDefaultValueConverter {
 
         // if converters is not null and the default value is not null, we need to convert default
         // value
-        if (converters != null && columnEditor.defaultValue() != null) {
-            Object defaultValue = columnEditor.defaultValue();
+        if (converters != null && columnEditor.defaultValueExpression().isPresent()) {
+            Object defaultValue = columnEditor.defaultValueExpression().get();
             final SchemaBuilder schemaBuilder = converters.schemaBuilder(column);
             if (schemaBuilder == null) {
                 return columnEditor;
@@ -444,7 +444,7 @@ public class MySqlDefaultValueConverter {
                 defaultValue = convert(column, (String) defaultValue);
             }
             defaultValue = valueConverter.convert(defaultValue);
-            columnEditor.defaultValue(defaultValue);
+            columnEditor.defaultValueExpression((String) defaultValue);
         }
         return columnEditor;
     }

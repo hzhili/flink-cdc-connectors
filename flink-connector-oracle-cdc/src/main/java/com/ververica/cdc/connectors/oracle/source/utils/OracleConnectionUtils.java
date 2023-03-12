@@ -91,7 +91,6 @@ public class OracleConnectionUtils {
                 "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
                         + "WHERE OWNER NOT IN ('SYSTEM','SYSAUX')";
 
-
         try {
             jdbcConnection.query(
                     queryTablesSql,
@@ -109,13 +108,11 @@ public class OracleConnectionUtils {
         }
 
         for (TableId tableId : tableIdSet) {
-            if (tableId.table().equalsIgnoreCase("MZSF_CLININFO")) {
-                if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-                    capturedTableIds.add(tableId);
-                    LOG.info("\t including '{}' for further processing", tableId);
-                } else {
-                    LOG.debug("\t '{}' is filtered out of capturing", tableId);
-                }
+            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+                capturedTableIds.add(tableId);
+                LOG.info("\t including '{}' for further processing", tableId);
+            } else {
+                LOG.debug("\t '{}' is filtered out of capturing", tableId);
             }
         }
 

@@ -23,7 +23,8 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 /** Oracle test. */
 public class OracleTest {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        System.out.println(System.getProperty("java.library.path"));
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         StreamTableEnvironment tEnv =

@@ -63,7 +63,7 @@ public class OracleCatalogFactory implements CatalogFactory {
     public Catalog createCatalog(Context context) {
         Configuration configuration = Configuration.from(context.getOptions());
         String databaseName = configuration.getString(DATABASE_NAME.key()).toUpperCase();
-        configuration.edit().with(DATABASE_NAME.key(),databaseName);
+        configuration.edit().with(DATABASE_NAME.key(), databaseName);
         final FactoryUtil.CatalogFactoryHelper helper =
                 FactoryUtil.createCatalogFactoryHelper(this, context);
         helper.validateExcept(DEBEZIUM_OPTIONS_PREFIX);

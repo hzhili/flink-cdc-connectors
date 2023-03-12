@@ -237,7 +237,6 @@ public class LogMinerStreamingChangeEventSource
                                 retryAttempts++;
                             } else {
                                 retryAttempts = 1;
-                                LOGGER.info("开始处理: startScn: {} endScn: {}", startScn, endScn);
                                 startScn = processor.process(startScn, endScn);
                                 afterHandleScn(partition, offsetContext);
                                 streamingMetrics.setCurrentBatchProcessingTime(

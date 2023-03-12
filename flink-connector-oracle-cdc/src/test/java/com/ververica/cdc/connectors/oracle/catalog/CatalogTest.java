@@ -50,7 +50,7 @@ public class CatalogTest {
         props.put(PASSWORD.key(), "cdcuser");
         props.put(DATABASE_NAME.key(), "HISDB");
         props.put(SCHEMA_NAME.key(), "BSHIS60");
-        props.put("scan.startup.mode","initial");
+        props.put("scan.startup.mode", "initial");
         catalog =
                 new OracleCatalog(
                         "oracle",
@@ -59,7 +59,7 @@ public class CatalogTest {
                         new OraclePooledDataSourceFactory(),
                         props);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
-//        env.setParallelism(1);
+        //        env.setParallelism(1);
         this.tEnv =
                 StreamTableEnvironment.create(
                         env, EnvironmentSettings.newInstance().inStreamingMode().build());
@@ -82,6 +82,8 @@ public class CatalogTest {
     @Test
     public void testQuery() {
         tEnv.executeSql("use BSHIS60");
-        tEnv.executeSql("SELECT * FROM MZSF_CLININFO /*+OPTIONS('scan.startup.mode'='latest-offset')*/").print();
+        tEnv.executeSql(
+                        "SELECT * FROM MZSF_CLININFO /*+OPTIONS('scan.startup.mode'='latest-offset')*/")
+                .print();
     }
 }

@@ -220,14 +220,13 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private Offsets<OraclePartition, OracleOffsetContext> loadStartingOffsetState(
-            OffsetContext.Loader loader, SourceSplitBase oracleSplit) {
+            OffsetContext.Loader<OracleOffsetContext> loader, SourceSplitBase oracleSplit) {
         Offset offset =
                 oracleSplit.isSnapshotSplit()
                         ? RedoLogOffset.INITIAL_OFFSET
                         : oracleSplit.asStreamSplit().getStartingOffset();
 
-        OracleOffsetContext oracleOffsetContext =
-                (OracleOffsetContext) loader.load(offset.getOffset());
+        OracleOffsetContext oracleOffsetContext = loader.load(offset.getOffset());
         OracleConnectorConfig connectorConfig = (OracleConnectorConfig) dbzConnectorConfig;
         final String databaseName =
                 Strings.isNullOrBlank(connectorConfig.getPdbName())

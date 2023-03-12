@@ -16,6 +16,15 @@
 
 package com.ververica.cdc.connectors.oracle.catalog;
 
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.factories.DynamicTableFactory;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.util.Preconditions;
+import org.apache.flink.util.StringUtils;
+
 import com.ververica.cdc.connectors.base.catalog.AbstractJdbcCatalog;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
@@ -27,14 +36,6 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
-import org.apache.flink.table.factories.DynamicTableFactory;
-import org.apache.flink.table.types.DataType;
-import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.shade.com.google.common.collect.Maps;
@@ -163,7 +164,7 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 
     @Override
     public DataType convertColumnType(Column column) {
-        if (column.name().equalsIgnoreCase("FORGID")){
+        if (column.name().equalsIgnoreCase("FORGID")) {
             return OracleTypeUtils.fromDbzColumn(column);
         }
         return OracleTypeUtils.fromDbzColumn(column);

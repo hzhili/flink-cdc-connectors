@@ -121,14 +121,15 @@ public class SqlServerSource {
             // all other connectors, since it is used as a prefix for all Kafka topic names
             // emanating from this connector. Only alphanumeric characters and underscores should be
             // used.
-            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+            //            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.port", String.valueOf(port));
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-            props.setProperty("database.dbname", checkNotNull(database));
-
+            props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
+            props.setProperty("database.names", String.join(",", checkNotNull(database)));
+            props.setProperty("database.encrypt", String.valueOf(false));
+            props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }

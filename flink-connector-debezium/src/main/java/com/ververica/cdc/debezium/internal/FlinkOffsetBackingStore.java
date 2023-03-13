@@ -17,11 +17,13 @@
 package com.ververica.cdc.debezium.internal;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import io.debezium.config.Instantiator;
 import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
 import org.apache.kafka.common.utils.ThreadUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.storage.Converter;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
@@ -34,6 +36,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -85,12 +88,12 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         }
 
         String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
-        Converter keyConverter = new JsonConverter();
-        Converter valueConverter = new JsonConverter();
-        keyConverter.configure(config.originals(), true);
-        Map<String, Object> valueConfigs = new HashMap<>(conf);
-        valueConfigs.put("schemas.enable", false);
-        valueConverter.configure(valueConfigs, true);
+        Map<String, String> internalConverterConfig =
+                Collections.singletonMap(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, "false");
+        Converter keyConverter = Instantiator.getInstance(JsonConverter.class.getName());
+        keyConverter.configure(internalConverterConfig, true);
+        Converter valueConverter = Instantiator.getInstance(JsonConverter.class.getName());
+        valueConverter.configure(internalConverterConfig, false);
         OffsetStorageWriter offsetWriter =
                 new OffsetStorageWriter(
                         this,
@@ -100,10 +103,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                         keyConverter,
                         valueConverter);
 
-        offsetWriter.offset(
-                (Map<String, Object>) debeziumOffset.sourcePartition,
-                (Map<String, Object>) debeziumOffset.sourceOffset);
-
+        offsetWriter.offset(debeziumOffset.sourcePartition,debeziumOffset.sourceOffset);
         // flush immediately
         if (!offsetWriter.beginFlush()) {
             // if nothing is needed to be flushed, there must be something wrong with the
@@ -190,9 +190,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
             final Map<ByteBuffer, ByteBuffer> values, final Callback<Void> callback) {
         return executor.submit(
                 () -> {
-                    for (Map.Entry<ByteBuffer, ByteBuffer> entry : values.entrySet()) {
-                        data.put(entry.getKey(), entry.getValue());
-                    }
+                    data.putAll(values);
                     if (callback != null) {
                         callback.onCompletion(null, null);
                     }

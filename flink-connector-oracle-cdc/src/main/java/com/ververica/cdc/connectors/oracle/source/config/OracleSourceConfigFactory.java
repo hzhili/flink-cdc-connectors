@@ -67,7 +67,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         // for all Kafka topic names emanating from this connector. Only alphanumeric characters
         // and
         // underscores should be used.
-        props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+        //        props.setProperty("database.server.name", DATABASE_SERVER_NAME);
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
@@ -80,15 +80,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
-        props.setProperty(
-                "topic.prefix",
-                DATABASE_SERVER_NAME
-                        + "."
-                        + databaseList.get(0)
-                        + "."
-                        + schemaList.get(0)
-                        + "."
-                        + tableList.get(0));
+        props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
 
         if (url != null) {
             props.setProperty("database.url", url);

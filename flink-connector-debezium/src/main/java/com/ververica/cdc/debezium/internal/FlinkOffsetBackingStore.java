@@ -103,7 +103,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                         keyConverter,
                         valueConverter);
 
-        offsetWriter.offset(debeziumOffset.sourcePartition,debeziumOffset.sourceOffset);
+        offsetWriter.offset(debeziumOffset.sourcePartition, debeziumOffset.sourceOffset);
         // flush immediately
         if (!offsetWriter.beginFlush()) {
             // if nothing is needed to be flushed, there must be something wrong with the
@@ -120,7 +120,9 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                             if (error != null) {
                                 LOG.error("Failed to flush initial offset.", error);
                             } else {
-                                LOG.debug("Successfully flush initial offset.");
+                                LOG.info(
+                                        "Successfully flush initial offset for {}.",
+                                        debeziumOffset);
                             }
                         });
 

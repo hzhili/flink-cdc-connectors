@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.oracle.source.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -54,7 +53,7 @@ public class OracleSchema {
     }
 
     private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
-        OracleConnection oracleConnection = (OracleConnection) jdbc;
+        //        OracleConnection oracleConnection = (OracleConnection) jdbc;
         //        Set<TableId> tableIdSet = new HashSet<>();
         //        tableIdSet.add(tableId);
 
@@ -63,7 +62,7 @@ public class OracleSchema {
         tables.overwriteTable(tables.editOrCreateTable(tableId).create());
 
         try {
-            oracleConnection.readSchema(
+            jdbc.readSchema(
                     tables,
                     tableId.catalog(),
                     tableId.schema(),

@@ -29,6 +29,7 @@ import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
+import io.debezium.connector.oracle.OraclePartition;
 import io.debezium.connector.oracle.OracleValueConverters;
 import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
@@ -188,7 +189,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
     private void dispatchBinlogEndEvent(
             StreamSplit backFillBinlogSplit,
             Map<String, ?> sourcePartition,
-            JdbcSourceEventDispatcher eventDispatcher)
+            JdbcSourceEventDispatcher<OraclePartition> eventDispatcher)
             throws InterruptedException {
         eventDispatcher.dispatchWatermarkEvent(
                 sourcePartition,
@@ -253,6 +254,12 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 throw e;
             } catch (Exception t) {
                 throw new DebeziumException(t);
+            } finally {
+                try {
+                    jdbcConnection.close();
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 

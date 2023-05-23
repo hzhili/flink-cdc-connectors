@@ -32,8 +32,8 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.Connection;
@@ -268,6 +268,31 @@ public class OracleUtils {
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleConnection oracleConnection =
                 OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
+        //        OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
+        OracleValueConverters oracleValueConverters =
+                new OracleValueConverters(dbzOracleConfig, oracleConnection);
+        OracleDefaultValueConverter defaultValueConverter =
+                new OracleDefaultValueConverter(oracleValueConverters, oracleConnection);
+        StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
+                dbzOracleConfig.getAdapter().getTableNameCaseSensitivity(oracleConnection);
+        return new OracleDatabaseSchema(
+                dbzOracleConfig,
+                oracleValueConverters,
+                defaultValueConverter,
+                schemaNameAdjuster,
+                topicNamingStrategy,
+                tableNameCaseSensitivity);
+    }
+
+    /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
+    public static OracleDatabaseSchema createOracleDatabaseSchema(
+            OracleConnectorConfig dbzOracleConfig, OracleConnection oracleConnection) {
+        TopicNamingStrategy<TableId> topicNamingStrategy =
+                dbzOracleConfig.getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
+        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
+        //        OracleConnection oracleConnection =
+        //
+        // OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
         //        OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);

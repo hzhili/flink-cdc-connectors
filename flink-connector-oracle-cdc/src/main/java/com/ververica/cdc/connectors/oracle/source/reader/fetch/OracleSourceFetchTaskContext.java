@@ -102,7 +102,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         .getDbzConfiguration()
                         .getString(EmbeddedFlinkDatabaseHistory.SCHEMA_HISTORY_INTERNAL_NAME),
                 sourceSplitBase.getTableSchemas().values());
-        this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig);
+        this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig, connection);
         // todo logMiner or xStream
         this.offsets =
                 loadStartingOffsetState(
@@ -128,7 +128,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
         this.dispatcher =
-                new JdbcSourceEventDispatcher(
+                new JdbcSourceEventDispatcher<OraclePartition>(
                         connectorConfig,
                         topicNamingStrategy,
                         databaseSchema,

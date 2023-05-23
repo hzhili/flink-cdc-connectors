@@ -140,6 +140,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                             READER_CLOSE_TIMEOUT_SECONDS);
                 }
             }
+
         } catch (Exception e) {
             LOG.error("Close stream fetcher error", e);
         }

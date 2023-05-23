@@ -102,7 +102,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
                 OracleConnection connection,
-                JdbcSourceEventDispatcher dispatcher,
+                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
                 ErrorHandler errorHandler,
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,

@@ -38,6 +38,8 @@ public abstract class JdbcConnectionPoolFactory {
         config.setUsername(sourceConfig.getUsername());
         config.setPassword(sourceConfig.getPassword());
         config.setMinimumIdle(MINIMUM_POOL_SIZE);
+        config.setIdleTimeout(300000);
+        config.setKeepaliveTime(60000);
         config.setMaximumPoolSize(sourceConfig.getConnectionPoolSize());
         config.setConnectionTimeout(sourceConfig.getConnectTimeout().toMillis());
         config.addDataSourceProperty(SERVER_TIMEZONE_KEY, sourceConfig.getServerTimeZone());

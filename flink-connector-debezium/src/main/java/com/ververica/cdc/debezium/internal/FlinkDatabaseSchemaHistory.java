@@ -188,12 +188,12 @@ public class FlinkDatabaseSchemaHistory implements SchemaHistory {
         // do nothing
     }
 
-    @Override
+    // @Override
     public boolean storeOnlyCapturedTables() {
         return storeOnlyMonitoredTablesDdl;
     }
 
-    @Override
+    // @Override
     public boolean skipUnparseableDdlStatements() {
         return skipUnparseableDDL;
     }

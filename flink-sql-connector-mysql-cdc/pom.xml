@@ -54,6 +54,8 @@ under the License.
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-ddl-parser</include>
+                                    <include>io.debezium:debezium-storage-kafka</include>
+                                    <include>io.debezium:debezium-storage-file</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-mysql-cdc</include>

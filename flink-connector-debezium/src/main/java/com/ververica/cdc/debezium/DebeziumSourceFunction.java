@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.debezium;
 
-import io.debezium.embedded.ConvertingEngineBuilder;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.state.CheckpointListener;
@@ -405,7 +404,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         handover);
 
         // create the engine with this configuration ...
-        ConvertingEngineBuilder
+
         this.engine =
                 DebeziumEngine.create(Connect.class)
                         .using(properties)

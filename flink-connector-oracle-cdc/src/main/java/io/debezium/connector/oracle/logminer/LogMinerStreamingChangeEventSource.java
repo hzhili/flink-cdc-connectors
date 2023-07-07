@@ -1,7 +1,17 @@
 /*
- * Copyright Debezium Authors.
+ * Copyright 2023 Ververica Inc.
  *
- * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package io.debezium.connector.oracle.logminer;
@@ -24,7 +34,6 @@ import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
-import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -54,8 +63,9 @@ import java.util.stream.Collectors;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 
 /**
- * A {@link StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop
- * is executed in a separate executor.
+ * Copied from Debezium 1.9.7. Diff: added afterHandleScn() method. A {@link
+ * StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop is
+ * executed in a separate executor.
  */
 public class LogMinerStreamingChangeEventSource
         implements StreamingChangeEventSource<OraclePartition, OracleOffsetContext> {
@@ -238,13 +248,14 @@ public class LogMinerStreamingChangeEventSource
                             } else {
                                 retryAttempts = 1;
                                 startScn = processor.process(startScn, endScn);
-                                afterHandleScn(partition, offsetContext);
                                 streamingMetrics.setCurrentBatchProcessingTime(
                                         Duration.between(start, Instant.now()));
                                 captureSessionMemoryStatistics(jdbcConnection);
                             }
                             pauseBetweenMiningSessions();
                         }
+
+                        afterHandleScn(partition, offsetContext);
                     }
                 }
             }
@@ -259,7 +270,7 @@ public class LogMinerStreamingChangeEventSource
         }
     }
 
-    protected void afterHandleScn(Partition partition, OracleOffsetContext offsetContext) {}
+    protected void afterHandleScn(OraclePartition partition, OracleOffsetContext offsetContext) {}
 
     private void logOnlineRedoLogSizes(OracleConnectorConfig config) throws SQLException {
         jdbcConnection.query(

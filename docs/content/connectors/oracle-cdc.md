@@ -14,7 +14,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oracle-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3.0</version>
+  <version>2.4.0</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 **Download link is available only for stable releases.**
 
-Download [flink-sql-connector-oracle-cdc-2.3.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.3.0/flink-sql-connector-oracle-cdc-2.3.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oracle-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.4.0/flink-sql-connector-oracle-cdc-2.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
 
@@ -98,6 +98,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT LOGMINING TO flinkuser;
 
      GRANT CREATE TABLE TO flinkuser;
+     -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
      GRANT LOCK ANY TABLE TO flinkuser;
      GRANT ALTER ANY TABLE TO flinkuser;
      GRANT CREATE SEQUENCE TO flinkuser;
@@ -187,7 +188,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      exit
    ```
    
-See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#setting-up-oracle)
+See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#setting-up-oracle)
 
 How to create an Oracle CDC table
 ----------------
@@ -217,6 +218,9 @@ Flink SQL> SELECT * FROM products;
 ```
 **Note:**
 When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in Flink DDL to specific the name of the PDB to connect to.
+
+**Note:**
+While the connector might work with a variety of Oracle versions and editions, only Oracle 9i, 10g, 11g and 12c have been tested.
 
 Connector Options
 ----------------
@@ -303,7 +307,7 @@ Connector Options
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
            and "latest-offset". 
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
-    </tr> 
+    </tr>
     <tr>
           <td>scan.incremental.snapshot.enabled</td>
           <td>optional</td>
@@ -335,39 +339,7 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">3</td>
           <td>Integer</td>
-          <td>The max retry times that the connector should retry to build MySQL database server connection.</td>
-    </tr>
-    <tr>
-      <td>chunk-meta.group.size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">1000</td>
-      <td>Integer</td>
-      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
-    </tr>
-    <tr>
-          <td>connect.timeout</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">30s</td>
-          <td>Duration</td>
-          <td>The maximum time that the connector should wait after trying to connect to the Oracle database server before timing out.</td>
-    </tr> 
-    <tr>
-          <td>chunk-key.even-distribution.factor.lower-bound</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">0.05d</td>
-          <td>Double</td>
-          <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
-    </tr> 
-    <tr>
-          <td>chunk-key.even-distribution.factor.upper-bound</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">1000.0d</td>
-          <td>Double</td>
-          <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+          <td>The max retry times that the connector should retry to build Oracle database server connection.</td>
     </tr>
     <tr>
           <td>connection.pool.size</td>
@@ -383,8 +355,15 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Oracle server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
-     </tr>
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
+    </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -465,14 +444,14 @@ CREATE TABLE products (
 );
 ```
 
-**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL. 
+**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL.
 
 Features
 --------
 
 ### Exactly-Once Processing
 
-The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#how-the-oracle-connector-works).
+The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#how-the-oracle-connector-works).
 
 ### Startup Reading Position
 

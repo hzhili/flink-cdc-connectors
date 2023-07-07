@@ -1,5 +1,5 @@
 /// *
-// * Copyright 2022 Ververica Inc.
+// * Copyright 2023 Ververica Inc.
 // *
 // * Licensed under the Apache License, Version 2.0 (the "License");
 // * you may not use this file except in compliance with the License.
@@ -24,7 +24,13 @@
 // import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 // import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 // import io.debezium.DebeziumException;
-// import io.debezium.connector.mysql.*;
+// import io.debezium.connector.mysql.MySqlConnection;
+// import io.debezium.connector.mysql.MySqlConnectorConfig;
+// import io.debezium.connector.mysql.MySqlOffsetContext;
+// import io.debezium.connector.mysql.MySqlPartition;
+// import io.debezium.connector.mysql.MySqlStreamingChangeEventSource;
+// import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+// import io.debezium.connector.mysql.MySqlTaskContext;
 // import io.debezium.pipeline.ErrorHandler;
 // import io.debezium.pipeline.source.spi.ChangeEventSource;
 // import io.debezium.util.Clock;
@@ -55,7 +61,6 @@
 //        binlogSplitReadTask =
 //                new MySqlBinlogSplitReadTask(
 //                        sourceFetchContext.getDbzConnectorConfig(),
-//                        sourceFetchContext.getOffsetContext(),
 //                        sourceFetchContext.getConnection(),
 //                        sourceFetchContext.getDispatcher(),
 //                        sourceFetchContext.getErrorHandler(),
@@ -64,8 +69,10 @@
 //                        split);
 //        BinlogSplitChangeEventSourceContext changeEventSourceContext =
 //                new BinlogSplitChangeEventSourceContext();
-////        binlogSplitReadTask.execute(
-////                changeEventSourceContext, sourceFetchContext.getOffsetContext());
+//        binlogSplitReadTask.execute(
+//                changeEventSourceContext,
+//                sourceFetchContext.getPartition(),
+//                sourceFetchContext.getOffsetContext());
 //    }
 //
 //    @Override
@@ -78,6 +85,11 @@
 //        return split;
 //    }
 //
+//    @Override
+//    public void close() {
+//        taskRunning = false;
+//    }
+//
 //    /**
 //     * A wrapped task to read all binlog for table and also supports read bounded (from
 // lowWatermark
@@ -87,16 +99,14 @@
 //
 //        private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
 //        private final StreamSplit binlogSplit;
-//        private final MySqlOffsetContext offsetContext;
-//        private final JdbcSourceEventDispatcher dispatcher;
+//        private final JdbcSourceEventDispatcher<MySqlPartition> dispatcher;
 //        private final ErrorHandler errorHandler;
 //        private ChangeEventSourceContext context;
 //
 //        public MySqlBinlogSplitReadTask(
 //                MySqlConnectorConfig connectorConfig,
-//                MySqlOffsetContext offsetContext,
 //                MySqlConnection connection,
-//                JdbcSourceEventDispatcher dispatcher,
+//                JdbcSourceEventDispatcher<MySqlPartition> dispatcher,
 //                ErrorHandler errorHandler,
 //                MySqlTaskContext taskContext,
 //                MySqlStreamingChangeEventSourceMetrics metrics,
@@ -111,22 +121,23 @@
 //                    metrics);
 //            this.binlogSplit = binlogSplit;
 //            this.dispatcher = dispatcher;
-//            this.offsetContext = offsetContext;
 //            this.errorHandler = errorHandler;
 //        }
 //
 //        @Override
-//        public void execute(ChangeEventSourceContext context, MySqlPartition partition,
-// MySqlOffsetContext offsetContext)
+//        public void execute(
+//                ChangeEventSourceContext context,
+//                MySqlPartition partition,
+//                MySqlOffsetContext offsetContext)
 //                throws InterruptedException {
 //            this.context = context;
-//            super.execute(context,partition, offsetContext);
+//            super.execute(context, partition, offsetContext);
 //        }
 //
 //        @Override
-//        protected void handleEvent(MySqlPartition partition, MySqlOffsetContext offsetContext,
-// Event event) {
-//            super.handleEvent(partition,offsetContext, event);
+//        protected void handleEvent(
+//                MySqlPartition partition, MySqlOffsetContext offsetContext, Event event) {
+//            super.handleEvent(partition, offsetContext, event);
 //            // check do we need to stop for fetch binlog for snapshot split.
 //            if (isBoundedRead()) {
 //                final BinlogOffset currentBinlogOffset =

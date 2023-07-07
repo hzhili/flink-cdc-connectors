@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,20 +40,15 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMy
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
 /** A component used to get schema by table path. */
-public class MySqlSchema {
+public class MySqlSchema implements AutoCloseable {
     private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
     private static final String DESC_TABLE = "DESC ";
 
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
-    private final MySqlPartition partition;
 
-    public MySqlSchema(
-            MySqlPartition partition,
-            MySqlSourceConfig sourceConfig,
-            boolean isTableIdCaseSensitive) {
-        this.partition = partition;
+    public MySqlSchema(MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
         this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, isTableIdCaseSensitive);
         this.schemasByTableId = new HashMap<>();
@@ -63,11 +58,12 @@ public class MySqlSchema {
      * Gets table schema for the given table path. It will request to MySQL server by running `SHOW
      * CREATE TABLE` if cache missed.
      */
-    public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {
+    public TableChange getTableSchema(
+            MySqlPartition partition, JdbcConnection jdbc, TableId tableId) {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
         if (schema == null) {
-            schema = buildTableSchema(jdbc, tableId);
+            schema = buildTableSchema(partition, jdbc, tableId);
             schemasByTableId.put(tableId, schema);
         }
         return schema;
@@ -77,14 +73,15 @@ public class MySqlSchema {
     // Helpers
     // ------------------------------------------------------------------------------------------
 
-    private TableChange buildTableSchema(JdbcConnection jdbc, TableId tableId) {
+    private TableChange buildTableSchema(
+            MySqlPartition partition, JdbcConnection jdbc, TableId tableId) {
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         String showCreateTable = SHOW_CREATE_TABLE + quote(tableId);
-        buildSchemaByShowCreateTable(jdbc, tableId, tableChangeMap);
+        buildSchemaByShowCreateTable(partition, jdbc, tableId, tableChangeMap);
         if (!tableChangeMap.containsKey(tableId)) {
             // fallback to desc table
             String descTable = DESC_TABLE + quote(tableId);
-            buildSchemaByDescTable(jdbc, descTable, tableId, tableChangeMap);
+            buildSchemaByDescTable(partition, jdbc, descTable, tableId, tableChangeMap);
             if (!tableChangeMap.containsKey(tableId)) {
                 throw new FlinkRuntimeException(
                         String.format(
@@ -96,7 +93,10 @@ public class MySqlSchema {
     }
 
     private void buildSchemaByShowCreateTable(
-            JdbcConnection jdbc, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
+            MySqlPartition partition,
+            JdbcConnection jdbc,
+            TableId tableId,
+            Map<TableId, TableChange> tableChangeMap) {
         final String sql = SHOW_CREATE_TABLE + quote(tableId);
         try {
             jdbc.query(
@@ -104,7 +104,7 @@ public class MySqlSchema {
                     rs -> {
                         if (rs.next()) {
                             final String ddl = rs.getString(2);
-                            parseSchemaByDdl(ddl, tableId, tableChangeMap);
+                            parseSchemaByDdl(partition, ddl, tableId, tableChangeMap);
                         }
                     });
         } catch (SQLException e) {
@@ -115,7 +115,10 @@ public class MySqlSchema {
     }
 
     private void parseSchemaByDdl(
-            String ddl, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
+            MySqlPartition partition,
+            String ddl,
+            TableId tableId,
+            Map<TableId, TableChange> tableChangeMap) {
         final MySqlOffsetContext offsetContext = MySqlOffsetContext.initial(connectorConfig);
         List<SchemaChangeEvent> schemaChangeEvents =
                 databaseSchema.parseSnapshotDdl(
@@ -128,6 +131,7 @@ public class MySqlSchema {
     }
 
     private void buildSchemaByDescTable(
+            MySqlPartition partition,
             JdbcConnection jdbc,
             String descTable,
             TableId tableId,
@@ -155,6 +159,7 @@ public class MySqlSchema {
                         }
                     });
             parseSchemaByDdl(
+                    partition,
                     new MySqlTableDefinition(tableId, fieldMetas, primaryKeys).toDdl(),
                     tableId,
                     tableChangeMap);
@@ -164,5 +169,10 @@ public class MySqlSchema {
                             "Failed to read schema for table %s by running %s", tableId, descTable),
                     e);
         }
+    }
+
+    @Override
+    public void close() {
+        databaseSchema.close();
     }
 }

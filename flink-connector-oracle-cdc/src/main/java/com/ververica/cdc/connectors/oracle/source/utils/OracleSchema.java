@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,10 +53,6 @@ public class OracleSchema {
     }
 
     private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
-        //        OracleConnection oracleConnection = (OracleConnection) jdbc;
-        //        Set<TableId> tableIdSet = new HashSet<>();
-        //        tableIdSet.add(tableId);
-
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         Tables tables = new Tables();
         tables.overwriteTable(tables.editOrCreateTable(tableId).create());
@@ -69,9 +65,6 @@ public class OracleSchema {
                     t -> t.table().equalsIgnoreCase(tableId.table()),
                     null,
                     false);
-            //            oracleConnection.readSchemaForCapturedTables(
-            //                    tables, tableId.catalog(), tableId.schema(), null, false,
-            // tableIdSet);
             Table table = tables.forTable(tableId);
             TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
             tableChangeMap.put(tableId, tableChange);

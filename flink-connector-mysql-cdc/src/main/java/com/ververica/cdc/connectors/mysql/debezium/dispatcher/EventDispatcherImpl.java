@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
@@ -48,7 +49,7 @@ import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_POSITION_OFFSET_KEY;
-import static io.debezium.connector.mysql.StatefulTaskContext.MySqlEventMetadataProvider.SERVER_ID_KEY;
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.MySqlEventMetadataProvider.SERVER_ID_KEY;
 
 /**
  * A subclass implementation of {@link EventDispatcher}.
@@ -141,6 +142,11 @@ public class EventDispatcherImpl<T extends DataCollectionId>
             }
         }
         schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+        IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
+                getIncrementalSnapshotChangeEventSource();
+        if (incrementalEventSource != null) {
+            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+        }
     }
 
     @Override

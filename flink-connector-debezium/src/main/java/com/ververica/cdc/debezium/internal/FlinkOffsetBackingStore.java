@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,11 @@
 package com.ververica.cdc.debezium.internal;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import io.debezium.config.Instantiator;
 import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
 import org.apache.kafka.common.utils.ThreadUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
-import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.storage.Converter;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
@@ -36,7 +34,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -66,6 +63,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
     protected Map<ByteBuffer, ByteBuffer> data = new HashMap<>();
     protected ExecutorService executor;
 
+    @SuppressWarnings("unchecked")
     @Override
     public void configure(WorkerConfig config) {
         // eagerly initialize the executor, because OffsetStorageWriter will use it later
@@ -88,12 +86,12 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         }
 
         String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
-        Map<String, String> internalConverterConfig =
-                Collections.singletonMap(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, "false");
-        Converter keyConverter = Instantiator.getInstance(JsonConverter.class.getName());
-        keyConverter.configure(internalConverterConfig, true);
-        Converter valueConverter = Instantiator.getInstance(JsonConverter.class.getName());
-        valueConverter.configure(internalConverterConfig, false);
+        Converter keyConverter = new JsonConverter();
+        Converter valueConverter = new JsonConverter();
+        keyConverter.configure(config.originals(), true);
+        Map<String, Object> valueConfigs = new HashMap<>(conf);
+        valueConfigs.put("schemas.enable", false);
+        valueConverter.configure(valueConfigs, true);
         OffsetStorageWriter offsetWriter =
                 new OffsetStorageWriter(
                         this,
@@ -103,7 +101,10 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                         keyConverter,
                         valueConverter);
 
-        offsetWriter.offset(debeziumOffset.sourcePartition, debeziumOffset.sourceOffset);
+        offsetWriter.offset(
+                (Map<String, Object>) debeziumOffset.sourcePartition,
+                (Map<String, Object>) debeziumOffset.sourceOffset);
+
         // flush immediately
         if (!offsetWriter.beginFlush()) {
             // if nothing is needed to be flushed, there must be something wrong with the
@@ -120,9 +121,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                             if (error != null) {
                                 LOG.error("Failed to flush initial offset.", error);
                             } else {
-                                LOG.info(
-                                        "Successfully flush initial offset for {}.",
-                                        debeziumOffset);
+                                LOG.debug("Successfully flush initial offset.");
                             }
                         });
 

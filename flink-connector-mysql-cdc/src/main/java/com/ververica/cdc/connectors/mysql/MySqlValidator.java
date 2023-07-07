@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,8 +72,7 @@ public class MySqlValidator implements Validator {
                 connection = DebeziumUtils.openJdbcConnection(sourceConfig);
             } else {
                 // for the legacy source
-                connection =
-                        DebeziumUtils.createMySqlConnection(from(dbzProperties), new Properties());
+                connection = DebeziumUtils.createMySqlConnection(from(dbzProperties));
             }
             checkVersion(connection);
             checkBinlogFormat(connection);

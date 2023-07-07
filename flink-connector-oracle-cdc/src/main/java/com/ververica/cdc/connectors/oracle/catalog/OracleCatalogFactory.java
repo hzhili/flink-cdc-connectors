@@ -108,6 +108,7 @@ public class OracleCatalogFactory implements CatalogFactory {
                 SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                 SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                 false,
+                true,
                 configuration.asProperties(),
                 configuration,
                 DRIVER_ClASS_NAME,

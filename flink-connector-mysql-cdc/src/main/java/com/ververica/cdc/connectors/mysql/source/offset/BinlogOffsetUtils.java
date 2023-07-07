@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 package com.ververica.cdc.connectors.mysql.source.offset;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.StatefulTaskContext;
 
 /** Utils for handling {@link BinlogOffset}. */
 public class BinlogOffsetUtils {

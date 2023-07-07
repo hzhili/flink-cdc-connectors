@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,17 +75,17 @@ public class MySqlSnapshotSplitReadTask
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
     private final TopicNamingStrategy<TableId> topicNamingStrategy;
-    private final EventDispatcher.SnapshotReceiver snapshotReceiver;
-    private final SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
+    private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
+    private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
-            SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics,
+            SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics,
             MySqlDatabaseSchema databaseSchema,
             MySqlConnection jdbcConnection,
             EventDispatcherImpl<TableId> dispatcher,
             TopicNamingStrategy<TableId> topicNamingStrategy,
-            EventDispatcher.SnapshotReceiver snapshotReceiver,
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
@@ -131,16 +131,11 @@ public class MySqlSnapshotSplitReadTask
             SnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext,
             SnapshottingTask snapshottingTask)
             throws Exception {
-        final RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
-                        MySqlPartition, MySqlOffsetContext>
-                ctx =
-                        (RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
-                                        MySqlPartition, MySqlOffsetContext>)
-                                snapshotContext;
+        final MySqlSnapshotContext ctx = (MySqlSnapshotContext) snapshotContext;
         ctx.offset = previousOffset;
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
-                        snapshotContext.partition.getSourcePartition(),
+                        previousOffset.getOffset(),
                         topicNamingStrategy.dataChangeTopic(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
@@ -155,7 +150,7 @@ public class MySqlSnapshotSplitReadTask
                 snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
         LOG.info("Snapshot step 2 - Snapshotting data");
-        createDataEvents(snapshotContext.partition, ctx, snapshotSplit.getTableId());
+        createDataEvents(ctx, snapshotSplit.getTableId());
 
         final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
@@ -172,40 +167,36 @@ public class MySqlSnapshotSplitReadTask
 
     @Override
     protected SnapshottingTask getSnapshottingTask(
-            MySqlPartition partition, MySqlOffsetContext offsetContext) {
+            MySqlPartition partition, MySqlOffsetContext previousOffset) {
         return new SnapshottingTask(false, true);
     }
 
     @Override
-    protected SnapshotContext prepare(MySqlPartition partition) throws Exception {
+    protected MySqlSnapshotContext prepare(MySqlPartition partition) throws Exception {
         return new MySqlSnapshotContext(partition);
     }
 
     private static class MySqlSnapshotContext
-            extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext {
+            extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
+                    MySqlPartition, MySqlOffsetContext> {
 
         public MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
-
             super(partition, "");
         }
     }
 
-    private void createDataEvents(
-            MySqlPartition partition,
-            RelationalSnapshotChangeEventSource.RelationalSnapshotContext snapshotContext,
-            TableId tableId)
+    private void createDataEvents(MySqlSnapshotContext snapshotContext, TableId tableId)
             throws Exception {
         LOG.debug("Snapshotting table {}", tableId);
         createDataEventsForTable(
-                partition, snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
+                snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
         snapshotReceiver.completeSnapshot();
     }
 
     /** Dispatches the data change events for the records of a single table. */
     private void createDataEventsForTable(
-            MySqlPartition partition,
-            RelationalSnapshotChangeEventSource.RelationalSnapshotContext snapshotContext,
-            EventDispatcher.SnapshotReceiver snapshotReceiver,
+            MySqlSnapshotContext snapshotContext,
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Table table)
             throws InterruptedException {
 
@@ -255,13 +246,14 @@ public class MySqlSnapshotSplitReadTask
                             rows,
                             snapshotSplit.splitId(),
                             Strings.duration(stop - exportStart));
-                    snapshotChangeEventSourceMetrics.rowsScanned(partition, table.id(), rows);
+                    snapshotChangeEventSourceMetrics.rowsScanned(
+                            snapshotContext.partition, table.id(), rows);
                     logTimer = getTableScanLogTimer();
                 }
                 dispatcher.dispatchSnapshotEvent(
-                        partition,
+                        (MySqlPartition) snapshotContext.partition,
                         table.id(),
-                        getChangeRecordEmitter(partition, snapshotContext, table.id(), row),
+                        getChangeRecordEmitter(snapshotContext, table.id(), row),
                         snapshotReceiver);
             }
             LOG.info(
@@ -274,13 +266,11 @@ public class MySqlSnapshotSplitReadTask
         }
     }
 
-    protected ChangeRecordEmitter getChangeRecordEmitter(
-            MySqlPartition partition,
-            SnapshotContext snapshotContext,
-            TableId tableId,
-            Object[] row) {
+    protected ChangeRecordEmitter<MySqlPartition> getChangeRecordEmitter(
+            MySqlSnapshotContext snapshotContext, TableId tableId, Object[] row) {
         snapshotContext.offset.event(tableId, clock.currentTime());
-        return new SnapshotChangeRecordEmitter(partition, snapshotContext.offset, row, clock);
+        return new SnapshotChangeRecordEmitter<>(
+                snapshotContext.partition, snapshotContext.offset, row, clock);
     }
 
     private Threads.Timer getTableScanLogTimer() {

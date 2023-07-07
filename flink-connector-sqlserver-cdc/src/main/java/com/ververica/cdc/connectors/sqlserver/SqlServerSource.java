@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.sqlserver;
 
-import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.sqlserver.SqlServerConnector;
@@ -121,7 +121,6 @@ public class SqlServerSource {
             // all other connectors, since it is used as a prefix for all Kafka topic names
             // emanating from this connector. Only alphanumeric characters and underscores should be
             // used.
-            //            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
@@ -130,6 +129,7 @@ public class SqlServerSource {
             props.setProperty("database.names", String.join(",", checkNotNull(database)));
             props.setProperty("database.encrypt", String.valueOf(false));
             props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
+
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
@@ -137,9 +137,6 @@ public class SqlServerSource {
             switch (startupOptions.startupMode) {
                 case INITIAL:
                     props.setProperty("snapshot.mode", "initial");
-                    break;
-                case INITIAL_ONLY:
-                    props.setProperty("snapshot.mode", "initial_only");
                     break;
                 case LATEST_OFFSET:
                     props.setProperty("snapshot.mode", "schema_only");

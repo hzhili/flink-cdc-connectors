@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,11 @@ import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
+import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
+import com.ververica.cdc.connectors.oracle.util.ChunkUtils;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.oracle.OracleChangeEventSourceMetricsFactory;
@@ -54,14 +56,19 @@ import io.debezium.relational.Tables;
 import io.debezium.spi.schema.DataCollectionId;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Collect;
-import io.debezium.util.Strings;
+import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+
+import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
+import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
 public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -74,20 +81,19 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OracleDatabaseSchema databaseSchema;
     private OracleTaskContext taskContext;
     private OracleOffsetContext offsetContext;
-    private Offsets<OraclePartition, OracleOffsetContext> offsets;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
+    private OraclePartition partition;
+
+    private SnapshotChangeEventSourceMetrics<OraclePartition> snapshotChangeEventSourceMetrics;
     private OracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private TopicNamingStrategy<TableId> topicNamingStrategy;
-    private JdbcSourceEventDispatcher dispatcher;
+    private JdbcSourceEventDispatcher<OraclePartition> dispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private OracleErrorHandler errorHandler;
 
     public OracleSourceFetchTaskContext(
-            JdbcSourceConfig sourceConfig,
-            JdbcDataSourceDialect dataSourceDialect,
-            OracleConnection connection) {
+            JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dataSourceDialect) {
         super(sourceConfig, dataSourceDialect);
-        this.connection = connection;
+        this.connection = createOracleConnection(sourceConfig.getDbzConfiguration());
         this.metadataProvider = new OracleEventMetadataProvider();
     }
 
@@ -104,15 +110,18 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 sourceSplitBase.getTableSchemas().values());
         this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig, connection);
         // todo logMiner or xStream
-        this.offsets =
+        this.offsetContext =
                 loadStartingOffsetState(
                         new LogMinerOracleOffsetContextLoader(connectorConfig), sourceSplitBase);
-        validateAndLoadDatabaseHistory(offsets, databaseSchema);
+        this.partition =
+                new OraclePartition(
+                        connectorConfig.getLogicalName(), connectorConfig.getDatabaseName());
+        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
         this.taskContext = new OracleTaskContext(connectorConfig, databaseSchema);
         final int queueSize =
                 sourceSplitBase.isSnapshotSplit()
-                        ? 5
+                        ? getSourceConfig().getSplitSize()
                         : getSourceConfig().getDbzConnectorConfig().getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -128,7 +137,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
         this.dispatcher =
-                new JdbcSourceEventDispatcher<OraclePartition>(
+                new JdbcSourceEventDispatcher<>(
                         connectorConfig,
                         topicNamingStrategy,
                         databaseSchema,
@@ -168,14 +177,10 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public OracleOffsetContext getOffsetContext() {
-        return offsets.getTheOnlyOffset();
+        return offsetContext;
     }
 
-    public OraclePartition getPartition() {
-        return offsets.getTheOnlyPartition();
-    }
-
-    public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
+    public SnapshotChangeEventSourceMetrics<OraclePartition> getSnapshotChangeEventSourceMetrics() {
         return snapshotChangeEventSourceMetrics;
     }
 
@@ -195,17 +200,57 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public RowType getSplitType(Table table) {
-        return OracleUtils.getSplitType(table);
+        OracleSourceConfig oracleSourceConfig = getSourceConfig();
+        return ChunkUtils.getSplitType(
+                getChunkKeyColumn(table, oracleSourceConfig.getChunkKeyColumn()));
     }
 
     @Override
-    public JdbcSourceEventDispatcher getDispatcher() {
+    public boolean isDataChangeRecord(SourceRecord record) {
+        return SourceRecordUtils.isDataChangeRecord(record);
+    }
+
+    @Override
+    public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
+        RowType splitKeyType =
+                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+
+        // RowId is chunk key column by default, compare RowId
+        if (splitKeyType.getFieldNames().contains(ROWID.class.getSimpleName())) {
+            ConnectHeaders headers = (ConnectHeaders) record.headers();
+            ROWID rowId = null;
+            try {
+                rowId = new ROWID(headers.iterator().next().value().toString());
+            } catch (SQLException e) {
+                LOG.error("{} can not convert to RowId", record);
+            }
+            Object[] rowIds = new ROWID[] {rowId};
+            return SourceRecordUtils.splitKeyRangeContains(rowIds, splitStart, splitEnd);
+        } else {
+            // config chunk key column compare
+            Object[] key =
+                    SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+            return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+        }
+    }
+
+    @Override
+    public TableId getTableId(SourceRecord record) {
+        return SourceRecordUtils.getTableId(record);
+    }
+
+    @Override
+    public JdbcSourceEventDispatcher<OraclePartition> getDispatcher() {
         return dispatcher;
     }
 
     @Override
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return queue;
+    }
+
+    public OraclePartition getPartition() {
+        return partition;
     }
 
     @Override
@@ -218,28 +263,26 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return OracleUtils.getRedoLogPosition(sourceRecord);
     }
 
+    @Override
+    public void close() throws Exception {
+        connection.close();
+    }
+
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private Offsets<OraclePartition, OracleOffsetContext> loadStartingOffsetState(
+    private OracleOffsetContext loadStartingOffsetState(
             OffsetContext.Loader<OracleOffsetContext> loader, SourceSplitBase oracleSplit) {
         Offset offset =
                 oracleSplit.isSnapshotSplit()
                         ? RedoLogOffset.INITIAL_OFFSET
                         : oracleSplit.asStreamSplit().getStartingOffset();
 
-        OracleOffsetContext oracleOffsetContext = loader.load(offset.getOffset());
-        OracleConnectorConfig connectorConfig = (OracleConnectorConfig) dbzConnectorConfig;
-        final String databaseName =
-                Strings.isNullOrBlank(connectorConfig.getPdbName())
-                        ? connectorConfig.getDatabaseName()
-                        : connectorConfig.getPdbName();
-        OraclePartition partition =
-                new OraclePartition(dbzConnectorConfig.getLogicalName(), databaseName);
-        return Offsets.of(partition, oracleOffsetContext);
+        return loader.load(offset.getOffset());
     }
 
-    private void validateAndLoadDatabaseHistory(Offsets offset, OracleDatabaseSchema schema) {
+    private void validateAndLoadDatabaseHistory(
+            OracleOffsetContext offset, OracleDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(offset);
+        schema.recover(Offsets.of(partition, offset));
     }
 
     /** Copied from debezium for accessing here. */

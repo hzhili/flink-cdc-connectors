@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,10 +65,7 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                int scale = 0;
-                if (column.scale().isPresent()) {
-                    scale = column.scale().get() < 0 ? 0 : column.scale().get();
-                }
+                int scale = column.scale().orElse(0);
                 if (column.length() > 38 || scale > 38) {
                     return DataTypes.STRING();
                 }

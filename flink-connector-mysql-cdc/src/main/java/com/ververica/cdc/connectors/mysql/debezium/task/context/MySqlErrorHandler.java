@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,18 +48,13 @@ public class MySqlErrorHandler extends ErrorHandler {
     private final MySqlSourceConfig sourceConfig;
 
     public MySqlErrorHandler(
-            MySqlConnectorConfig connectorConfig,
+            MySqlConnectorConfig mySqlConnectorConfig,
             ChangeEventQueue<?> queue,
             MySqlTaskContext context,
             MySqlSourceConfig sourceConfig) {
-        super(MySqlConnector.class, connectorConfig, queue);
+        super(MySqlConnector.class, mySqlConnectorConfig, queue);
         this.context = context;
         this.sourceConfig = sourceConfig;
-    }
-
-    @Override
-    protected boolean isRetriable(Throwable throwable) {
-        return false;
     }
 
     @Override

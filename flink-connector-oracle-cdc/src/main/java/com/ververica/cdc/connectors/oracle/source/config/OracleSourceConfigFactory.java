@@ -73,7 +73,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
+        props.setProperty("database.names", checkNotNull(databaseList.get(0)));
         // database history
         props.setProperty(
                 "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());

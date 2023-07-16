@@ -25,6 +25,7 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.Partition;
@@ -134,7 +135,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
 
     @Override
     public void dispatchSchemaChangeEvent(
-            Partition partition,
+            P partition,
             TableId dataCollectionId,
             SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
@@ -145,6 +146,11 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
             }
         }
         schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+        IncrementalSnapshotChangeEventSource<P, TableId> incrementalEventSource =
+                getIncrementalSnapshotChangeEventSource();
+        if (incrementalEventSource != null) {
+            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+        }
     }
 
     @Override
@@ -185,12 +191,12 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         private Struct schemaChangeRecordValue(SchemaChangeEvent event) throws IOException {
             Struct sourceInfo = event.getSource();
             Map<String, Object> source = new HashMap<>();
-            //            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-            //            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-            //            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-            //            source.put(SERVER_ID_KEY, serverId);
-            //            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            //            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
+            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
+            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
+            source.put(SERVER_ID_KEY, serverId);
+            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
+            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
             HistoryRecord historyRecord =
                     new HistoryRecord(
                             source,

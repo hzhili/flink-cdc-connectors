@@ -101,7 +101,13 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
             return;
         }
         receiver.changeRecord(
-                getPartition(), tableSchema, Operation.CREATE, newKey, envelope, getOffset(), null);
+                getPartition(),
+                tableSchema,
+                Operation.CREATE,
+                newKey,
+                envelope,
+                getOffset(),
+                getStaticConnectHeaders());
     }
 
     @Override
@@ -119,7 +125,13 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                                 getClock().currentTimeAsInstant());
 
         receiver.changeRecord(
-                getPartition(), tableSchema, Operation.READ, newKey, envelope, getOffset(), null);
+                getPartition(),
+                tableSchema,
+                Operation.READ,
+                newKey,
+                envelope,
+                getOffset(),
+                getStaticConnectHeaders());
     }
 
     @Override
@@ -172,7 +184,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                     newKey,
                     envelope,
                     getOffset(),
-                    null);
+                    getStaticConnectHeaders());
         }
         // PK update -> emit as delete and re-insert with new key
         else {
@@ -204,7 +216,13 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                                 getOffset().getSourceInfo(),
                                 getClock().currentTimeAsInstant());
         receiver.changeRecord(
-                getPartition(), tableSchema, Operation.DELETE, oldKey, envelope, getOffset(), null);
+                getPartition(),
+                tableSchema,
+                Operation.DELETE,
+                oldKey,
+                envelope,
+                getOffset(),
+                getStaticConnectHeaders());
     }
 
     protected void emitTruncateRecord(Receiver<P> receiver, TableSchema schema)
@@ -240,7 +258,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
             Struct oldValue,
             Struct newValue)
             throws InterruptedException {
-        ConnectHeaders headers = new ConnectHeaders();
+        ConnectHeaders headers = getStaticConnectHeaders();
         headers.add(PK_UPDATE_NEWKEY_FIELD, newKey, tableSchema.keySchema());
 
         Struct envelope =
@@ -259,7 +277,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 getOffset(),
                 headers);
 
-        headers = new ConnectHeaders();
+        headers = getStaticConnectHeaders();
         headers.add(PK_UPDATE_OLDKEY_FIELD, oldKey, tableSchema.keySchema());
 
         envelope =

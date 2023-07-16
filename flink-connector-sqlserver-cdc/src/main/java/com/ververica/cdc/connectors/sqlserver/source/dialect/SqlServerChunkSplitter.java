@@ -300,7 +300,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) >= 0) {
             return null;
         } else {
             return chunkEnd;

@@ -241,6 +241,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
+                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
         }
     }

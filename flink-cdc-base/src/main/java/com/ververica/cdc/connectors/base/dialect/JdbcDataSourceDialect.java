@@ -20,12 +20,10 @@ import org.apache.flink.annotation.Experimental;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
-import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
-import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -51,18 +49,7 @@ public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfi
      * @param sourceConfig a basic source configuration.
      * @return a utility that simplifies using a JDBC connection.
      */
-    default JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        //        try {
-        //            jdbc.connect();
-        //        } catch (Exception e) {
-        //            throw new FlinkRuntimeException(e);
-        //        }
-        return new JdbcConnection(
-                JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
-                new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
-                null,
-                null);
-    }
+    JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig);
 
     /** Get a connection pool factory to create connection pool. */
     JdbcConnectionPoolFactory getPooledDataSourceFactory();

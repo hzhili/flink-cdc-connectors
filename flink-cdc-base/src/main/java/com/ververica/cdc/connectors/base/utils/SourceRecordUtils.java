@@ -44,6 +44,12 @@ public class SourceRecordUtils {
 
     private SourceRecordUtils() {}
 
+    private static final String SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX =
+            "io.debezium.connector.";
+
+    private static final String SCHEMA_HISTORY_CONNECTOR_KEY_SCHEMA_NAME_SUFFIX =
+            ".SchemaChangeKey";
+
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
@@ -95,7 +101,19 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        Struct value = (Struct) sourceRecord.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        if (source == null) {
+            return false;
+        }
+        String connector = source.getString("connector");
+        String schemaName =
+                String.format(
+                        "%s%s%s",
+                        SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX,
+                        connector,
+                        SCHEMA_HISTORY_CONNECTOR_KEY_SCHEMA_NAME_SUFFIX);
+        return keySchema != null && schemaName.equalsIgnoreCase(keySchema.name());
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {

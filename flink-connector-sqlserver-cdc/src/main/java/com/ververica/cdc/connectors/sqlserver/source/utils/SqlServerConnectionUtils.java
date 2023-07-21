@@ -18,8 +18,9 @@ package com.ververica.cdc.connectors.sqlserver.source.utils;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
-import io.debezium.connector.sqlserver.SqlServerJdbcConfiguration;
+import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerValueConverters;
+import io.debezium.connector.sqlserver.SqlServerJdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
@@ -48,8 +49,8 @@ public class SqlServerConnectionUtils {
                 SqlServerJdbcConfiguration.adapt(dbzConnectorConfig),
                 valueConverters,
                 connectorConfig.getSkippedOperations(),
-                false,
-                false);
+                ((SqlServerConnectorConfig)connectorConfig).useSingleDatabase(),
+                ((SqlServerConnectorConfig)connectorConfig).getOptionRecompile());
     }
 
     public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
@@ -84,7 +85,7 @@ public class SqlServerConnectionUtils {
                 jdbc.query(
                         "SELECT * FROM "
                                 + dbName
-                                + ".INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';",
+                                + ".INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'  AND TABLE_NAME ='NREGIPATI';",
                         rs -> {
                             while (rs.next()) {
                                 TableId tableId =

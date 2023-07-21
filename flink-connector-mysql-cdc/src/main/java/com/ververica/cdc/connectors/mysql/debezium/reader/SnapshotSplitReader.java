@@ -224,7 +224,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         statefulTaskContext.getOffsetContext().getOffset(),
-                        statefulTaskContext.getTopicNamingStrategy().schemaChangeTopic(),
+                        statefulTaskContext
+                                .getTopicNamingStrategy()
+                                .dataChangeTopic(currentSnapshotSplit.getTableId()),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 backFillBinlogSplit,

@@ -144,7 +144,7 @@ public class OracleSource {
             // for all Kafka topic names emanating from this connector. Only alphanumeric characters
             // and
             // underscores should be used.
-            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+            //            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
 
@@ -159,11 +159,9 @@ public class OracleSource {
             }
             props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
-            props.setProperty(
-                    "topic.prefix",
-                    DATABASE_SERVER_NAME + "." + database + "." + schemaList + "." + tableList);
+            props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
             if (schemaList != null) {
-                props.setProperty("schema.whitelist", String.join(",", schemaList));
+                props.setProperty("schema.include.list", String.join(",", schemaList));
             }
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));

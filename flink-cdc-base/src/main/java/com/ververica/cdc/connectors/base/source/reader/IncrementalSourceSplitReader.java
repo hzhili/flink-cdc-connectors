@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
 
     @Override
     public void close() throws Exception {
-        if (currentFetcher != null) {
+        if (currentFetcher != null || currentFetcher.isFinished()) {
             LOG.info("Close current fetcher {}", currentFetcher.getClass().getCanonicalName());
             currentFetcher.close();
             currentSplitId = null;

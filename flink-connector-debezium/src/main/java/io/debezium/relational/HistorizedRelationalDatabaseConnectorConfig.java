@@ -26,8 +26,10 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
- * Configuration options shared across the relational CDC connectors which use a persistent database
- * schema history.
+ * Copied from Debezium project. Configuration options shared across the relational CDC connectors
+ * which use a persistent database schema history.
+ *
+ * <p>Added JMX_METRICS_ENABLED option.
  */
 public abstract class HistorizedRelationalDatabaseConnectorConfig
         extends RelationalDatabaseConnectorConfig {

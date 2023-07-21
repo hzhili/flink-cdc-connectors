@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,11 +31,13 @@ import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.ConnectTableChangeSerializer;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Schema;
@@ -48,7 +50,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -63,6 +64,11 @@ import java.util.Map;
 public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatcher<P, TableId> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceEventDispatcher.class);
 
+    private static final String SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX =
+            "io.debezium.connector.";
+    private static final String SCHEMA_HISTORY_CONNECTOR_VALUE_SCHEMA_NAME_SUFFIX =
+            ".SchemaChangeValue";
+    private static final int SCHEMA_HISTORY_CONNECTOR_VALUE_SCHEMA_VERSION = 1;
     public static final String HISTORY_RECORD_FIELD = "historyRecord";
     public static final String SERVER_ID_KEY = "server_id";
     public static final String BINLOG_FILENAME_OFFSET_KEY = "file";
@@ -78,6 +84,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
     private final String topic;
+    private final ConnectTableChangeSerializer tableChangesSerializer;
 
     public JdbcSourceEventDispatcher(
             CommonConnectorConfig connectorConfig,
@@ -106,25 +113,31 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         this.connectorConfig = connectorConfig;
         this.topicNamingStrategy = topicNamingStrategy;
         this.topic = topicNamingStrategy.schemaChangeTopic();
-        this.schemaChangeKeySchema =
+        this.tableChangesSerializer = new ConnectTableChangeSerializer(schemaNameAdjuster);
+        schemaChangeKeySchema =
+                SchemaFactory.get()
+                        .schemaHistoryConnectorKeySchema(schemaNameAdjuster, connectorConfig);
+        schemaChangeValueSchema =
                 SchemaBuilder.struct()
                         .name(
                                 schemaNameAdjuster.adjust(
-                                        "io.debezium.connector."
-                                                + connectorConfig.getConnectorName()
-                                                + ".SchemaChangeKey"))
-                        .field(HistoryRecord.Fields.DATABASE_NAME, Schema.STRING_SCHEMA)
-                        .build();
-        this.schemaChangeValueSchema =
-                SchemaBuilder.struct()
-                        .name(
-                                schemaNameAdjuster.adjust(
-                                        "io.debezium.connector."
-                                                + connectorConfig.getConnectorName()
-                                                + ".SchemaChangeValue"))
+                                        String.format(
+                                                "%s%s%s",
+                                                SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX,
+                                                connectorConfig.getConnectorName(),
+                                                SCHEMA_HISTORY_CONNECTOR_VALUE_SCHEMA_NAME_SUFFIX)))
+                        .version(SCHEMA_HISTORY_CONNECTOR_VALUE_SCHEMA_VERSION)
                         .field(
                                 HistoryRecord.Fields.SOURCE,
                                 connectorConfig.getSourceInfoStructMaker().schema())
+                        .field(HistoryRecord.Fields.TIMESTAMP, Schema.INT64_SCHEMA)
+                        .field(HistoryRecord.Fields.DATABASE_NAME, Schema.OPTIONAL_STRING_SCHEMA)
+                        .field(HistoryRecord.Fields.SCHEMA_NAME, Schema.OPTIONAL_STRING_SCHEMA)
+                        .field(HistoryRecord.Fields.DDL_STATEMENTS, Schema.OPTIONAL_STRING_SCHEMA)
+                        .field(
+                                HistoryRecord.Fields.TABLE_CHANGES,
+                                SchemaBuilder.array(tableChangesSerializer.getChangeSchema())
+                                        .build())
                         .field(HISTORY_RECORD_FIELD, Schema.OPTIONAL_STRING_SCHEMA)
                         .build();
     }
@@ -189,17 +202,18 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         }
 
         private Struct schemaChangeRecordValue(SchemaChangeEvent event) throws IOException {
-            Struct sourceInfo = event.getSource();
-            Map<String, Object> source = new HashMap<>();
-            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-            source.put(SERVER_ID_KEY, serverId);
-            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            Struct result = new Struct(schemaChangeValueSchema);
+            result.put(HistoryRecord.Fields.SOURCE, event.getSource());
+            result.put(HistoryRecord.Fields.TIMESTAMP, event.getTimestamp().toEpochMilli());
+            result.put(HistoryRecord.Fields.DATABASE_NAME, event.getDatabase());
+            result.put(HistoryRecord.Fields.SCHEMA_NAME, event.getSchema());
+            result.put(HistoryRecord.Fields.DDL_STATEMENTS, event.getDdl());
+            result.put(
+                    HistoryRecord.Fields.TABLE_CHANGES,
+                    tableChangesSerializer.serialize(event.getTableChanges()));
             HistoryRecord historyRecord =
                     new HistoryRecord(
-                            source,
+                            null,
                             event.getOffset(),
                             event.getDatabase(),
                             null,
@@ -207,16 +221,14 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
                             event.getTableChanges(),
                             Instant.now());
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
-
-            Struct value = new Struct(schemaChangeValueSchema);
-            value.put(HistoryRecord.Fields.SOURCE, event.getSource());
-            value.put(HISTORY_RECORD_FIELD, historyStr);
-            return value;
+            result.put(HISTORY_RECORD_FIELD, historyStr);
+            return result;
         }
 
         @Override
         public void schemaChangeEvent(SchemaChangeEvent event) throws InterruptedException {
             historizedSchema.applySchemaChange(event);
+
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
                     final String topicName = topicNamingStrategy.schemaChangeTopic();

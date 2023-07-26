@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.base.catalog;
 
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
@@ -46,74 +45,59 @@ import org.apache.flink.table.expressions.Expression;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
-import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
-import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
-import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
-import io.debezium.relational.TableId;
-import io.debezium.relational.Tables;
 import org.apache.commons.compress.utils.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Abstract jdbc catalog. */
 public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractJdbcCatalog.class);
-    protected final JdbcSourceConfig jdbcSourceConfig;
-    protected final JdbcConnectionPoolFactory connectionPoolFactory;
-    protected final JdbcConfiguration jdbcConfiguration;
-    protected final JdbcConnectionFactory jdbcConnectionFactory;
 
-    public AbstractJdbcCatalog(
-            String name,
-            String defaultDatabase,
-            JdbcSourceConfig jdbcSourceConfig,
-            JdbcConnectionPoolFactory connectionPoolFactory) {
+    protected JdbcConnection connection;
+
+    public AbstractJdbcCatalog(String name, String defaultDatabase) {
         super(name, defaultDatabase);
-        this.jdbcSourceConfig = jdbcSourceConfig;
-        this.connectionPoolFactory = connectionPoolFactory;
-        this.jdbcConfiguration = JdbcConfiguration.adapt(jdbcSourceConfig.getDbzConfiguration());
-        this.jdbcConnectionFactory =
-                new JdbcConnectionFactory(jdbcSourceConfig, connectionPoolFactory);
     }
 
     @Override
     public void open() throws CatalogException {
-        try (JdbcConnection connection =
-                new JdbcConnection(jdbcConfiguration, jdbcConnectionFactory, null, null)) {
-            LOGGER.info(
-                    "Catalog {} established connection to {}",
-                    getName(),
-                    connectionPoolFactory.getJdbcUrl(jdbcSourceConfig));
-        } catch (Exception e) {
-            throw new ValidationException(
+        try {
+            connection = getJdbcConnection();
+            connection.connection();
+            LOGGER.info("Catalog {} established connection to {}", getName(), getUrl());
+        } catch (SQLException e) {
+            throw new CatalogException(
                     String.format(
                             "Failed testing connection for %s with user '%s'",
-                            jdbcConfiguration.withMaskedPasswords(),
-                            jdbcSourceConfig.getUsername()),
+                            connection.config().withMaskedPasswords(),
+                            connection.config().getUser()),
                     e);
         }
     }
 
+    public abstract JdbcConnection getJdbcConnection();
+
+    public abstract String getUrl();
+
     @Override
     public void close() throws CatalogException {
         try {
+            if (connection != null && connection.isConnected() && connection.isValid()) {
+                connection.close();
+            }
+            connection = null;
             LOGGER.info("Closed catalog {} ", getName());
         } catch (Exception e) {
             throw new CatalogException(String.format("Closing catalog %s failed.", getName()), e);
@@ -126,17 +110,6 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     }
 
     public abstract DynamicTableFactory getDynamicTableFactory();
-
-    @Override
-    public List<String> listDatabases() throws CatalogException {
-        try (JdbcConnection connection =
-                new JdbcConnection(jdbcConfiguration, jdbcConnectionFactory, null, null)) {
-            return new ArrayList<>(connection.readAllCatalogNames());
-        } catch (SQLException e) {
-            throw new CatalogException(
-                    String.format("Catalog %s failed get database.", getName()), e);
-        }
-    }
 
     @Override
     public CatalogDatabase getDatabase(String databaseName)
@@ -174,33 +147,6 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     }
 
     @Override
-    public List<String> listTables(String databaseName)
-            throws DatabaseNotExistException, CatalogException {
-        Preconditions.checkState(
-                !StringUtils.isNullOrWhitespaceOnly(databaseName),
-                "Database name must not be blank.");
-        if (!databaseExists(databaseName)) {
-            throw new DatabaseNotExistException(getName(), databaseName);
-        }
-
-        try (JdbcConnection conn =
-                new JdbcConnection(jdbcConfiguration, jdbcConnectionFactory, null, null)) {
-            Set<TableId> tableIds =
-                    conn.readTableNames(
-                            databaseName,
-                            getSchemaName(conn, databaseName, null),
-                            null,
-                            new String[] {"TABLE"});
-            return tableIds.stream().map(TableId::table).collect(Collectors.toList());
-        } catch (SQLException e) {
-            throw new CatalogException(e);
-        }
-    }
-
-    public abstract String getSchemaName(
-            JdbcConnection conn, String databaseName, String tableName);
-
-    @Override
     public List<String> listViews(String databaseName)
             throws DatabaseNotExistException, CatalogException {
         return Collections.emptyList();
@@ -222,41 +168,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
 
     public abstract Map<String, String> getTableOptions(ObjectPath tablePath);
 
-    public Schema createTableSchema(String databaseName, String tableName) {
-        try (JdbcConnection conn =
-                new JdbcConnection(
-                        JdbcConfiguration.adapt(jdbcSourceConfig.getDbzConfiguration()),
-                        new JdbcConnectionFactory(jdbcSourceConfig, connectionPoolFactory),
-                        null,
-                        null)) {
-            TableId tableId =
-                    new TableId(
-                            databaseName, getSchemaName(conn, databaseName, tableName), tableName);
-            Tables tables = new Tables();
-            conn.readSchema(
-                    tables,
-                    databaseName,
-                    tableId.schema(),
-                    t -> t.table().equalsIgnoreCase(tableName),
-                    null,
-                    false);
-            List<String> columnNames = new ArrayList<>();
-            List<DataType> columnTypes = new ArrayList<>();
-            tables.forTable(tableId)
-                    .columns()
-                    .forEach(
-                            column -> {
-                                String columnName = column.name();
-                                DataType flinkType = convertColumnType(column);
-                                columnNames.add(columnName);
-                                columnTypes.add(flinkType);
-                            });
-            return Schema.newBuilder().fromFields(columnNames, columnTypes).build();
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    public abstract Schema createTableSchema(String databaseName, String tableName);
 
     public abstract DataType convertColumnType(Column column);
 

@@ -13,24 +13,22 @@ import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.schema.DataCollectionSchema;
 import io.debezium.util.Clock;
-import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.ConnectHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Copied from Debezium 2.2.1.Final.
  *
  * <p>Base class for {@link ChangeRecordEmitter} implementations based on a relational database.
  *
- * <p>This class overrides the emit methods to put the ROWID in the header.
+ * <p>This class overrides the emit methods to put some values in the header.
  *
- * <p>Line 59 ~ 257: add ROWID and emit methods.
+ * <p>Line 59 ~ 257: add other headers and emit.
  */
 public abstract class RelationalChangeRecordEmitter<P extends Partition>
         extends AbstractChangeRecordEmitter<P, TableSchema> {
@@ -40,7 +38,6 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
 
     public static final String PK_UPDATE_OLDKEY_FIELD = "__debezium.oldkey";
     public static final String PK_UPDATE_NEWKEY_FIELD = "__debezium.newkey";
-    private final Map<String, SchemaAndValue> staticHeaders = new HashMap<>();
 
     public RelationalChangeRecordEmitter(P partition, OffsetContext offsetContext, Clock clock) {
         super(partition, offsetContext, clock);
@@ -73,10 +70,6 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
         }
     }
 
-    public void addStaticHeader(String key, SchemaAndValue value) {
-        this.staticHeaders.put(key, value);
-    }
-
     @Override
     protected void emitCreateRecord(Receiver<P> receiver, TableSchema tableSchema)
             throws InterruptedException {
@@ -107,7 +100,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 newKey,
                 envelope,
                 getOffset(),
-                getStaticConnectHeaders());
+                getEmitConnectHeaders().orElse(null));
     }
 
     @Override
@@ -131,7 +124,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 newKey,
                 envelope,
                 getOffset(),
-                getStaticConnectHeaders());
+                getEmitConnectHeaders().orElse(null));
     }
 
     @Override
@@ -184,7 +177,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                     newKey,
                     envelope,
                     getOffset(),
-                    getStaticConnectHeaders());
+                    getEmitConnectHeaders().orElse(null));
         }
         // PK update -> emit as delete and re-insert with new key
         else {
@@ -222,7 +215,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 oldKey,
                 envelope,
                 getOffset(),
-                getStaticConnectHeaders());
+                getEmitConnectHeaders().orElse(null));
     }
 
     protected void emitTruncateRecord(Receiver<P> receiver, TableSchema schema)
@@ -258,7 +251,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
             Struct oldValue,
             Struct newValue)
             throws InterruptedException {
-        ConnectHeaders headers = getStaticConnectHeaders();
+        ConnectHeaders headers = getEmitConnectHeaders().orElse(new ConnectHeaders());
         headers.add(PK_UPDATE_NEWKEY_FIELD, newKey, tableSchema.keySchema());
 
         Struct envelope =
@@ -277,7 +270,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 getOffset(),
                 headers);
 
-        headers = getStaticConnectHeaders();
+        headers = getEmitConnectHeaders().orElse(new ConnectHeaders());
         headers.add(PK_UPDATE_OLDKEY_FIELD, oldKey, tableSchema.keySchema());
 
         envelope =
@@ -297,9 +290,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                 headers);
     }
 
-    private ConnectHeaders getStaticConnectHeaders() {
-        ConnectHeaders headers = new ConnectHeaders();
-        staticHeaders.forEach(headers::add);
-        return headers;
+    protected Optional<ConnectHeaders> getEmitConnectHeaders() {
+        return Optional.empty();
     }
 }

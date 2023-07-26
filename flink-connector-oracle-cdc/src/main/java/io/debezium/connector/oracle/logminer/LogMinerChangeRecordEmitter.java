@@ -17,11 +17,15 @@ import io.debezium.relational.Table;
 import io.debezium.util.Clock;
 import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.SchemaAndValue;
+import org.apache.kafka.connect.header.ConnectHeaders;
+
+import java.util.Optional;
 
 /** Emits change records based on an event read from Oracle LogMiner. */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
 
     private final Operation operation;
+    private final String rowId;
 
     public LogMinerChangeRecordEmitter(
             OracleConnectorConfig connectorConfig,
@@ -36,7 +40,7 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
             String rowId) {
         super(connectorConfig, partition, offset, schema, table, clock, oldValues, newValues);
         this.operation = operation;
-        addStaticHeader(ROWID.class.getSimpleName(), new SchemaAndValue(null, rowId));
+        this.rowId = rowId;
     }
 
     public LogMinerChangeRecordEmitter(
@@ -80,5 +84,12 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
     @Override
     public Operation getOperation() {
         return operation;
+    }
+
+    @Override
+    protected Optional<ConnectHeaders> getEmitConnectHeaders() {
+        ConnectHeaders headers = new ConnectHeaders();
+        headers.add(ROWID.class.getSimpleName(), new SchemaAndValue(null, rowId));
+        return Optional.of(headers);
     }
 }

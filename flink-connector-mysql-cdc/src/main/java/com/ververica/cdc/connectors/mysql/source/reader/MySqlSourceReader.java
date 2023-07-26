@@ -28,6 +28,7 @@ import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
@@ -66,6 +67,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
+import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.filterOutdatedSplitInfos;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toNormalBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
@@ -206,6 +208,17 @@ public class MySqlSourceReader<T>
 
     @Override
     public void addSplits(List<MySqlSplit> splits) {
+        addSplits(splits, true);
+    }
+
+    /**
+     * Adds a list of splits for this reader to read.
+     *
+     * @param splits the splits to add.
+     * @param checkTableChangeForBinlogSplit to check the captured table list change or not, it
+     *     should be true for reader which is during restoration from a checkpoint or savepoint.
+     */
+    private void addSplits(List<MySqlSplit> splits, boolean checkTableChangeForBinlogSplit) {
         // restore for finishedUnackedSplits
         List<MySqlSplit> unfinishedSplits = new ArrayList<>();
         for (MySqlSplit split : splits) {
@@ -227,6 +240,20 @@ public class MySqlSourceReader<T>
                 }
             } else {
                 MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
+                // When restore from a checkpoint, the finished split infos may contain some splits
+                // for the deleted tables.
+                // We need to remove these splits for the deleted tables at the finished split
+                // infos.
+                if (checkTableChangeForBinlogSplit) {
+                    binlogSplit =
+                            filterOutdatedSplitInfos(
+                                    binlogSplit,
+                                    sourceConfig
+                                            .getMySqlConnectorConfig()
+                                            .getTableFilters()
+                                            .dataCollectionFilter());
+                }
+
                 // Try to discovery table schema once for newly added tables when source reader
                 // start or restore
                 boolean checkNewlyAddedTableSchema =
@@ -238,17 +265,18 @@ public class MySqlSourceReader<T>
                 if (binlogSplit.isSuspended()) {
                     suspendedBinlogSplit = binlogSplit;
                 } else if (!binlogSplit.isCompletedSplit()) {
-                    uncompletedBinlogSplits.put(split.splitId(), split.asBinlogSplit());
-                    requestBinlogSplitMetaIfNeeded(split.asBinlogSplit());
+                    uncompletedBinlogSplits.put(binlogSplit.splitId(), binlogSplit);
+                    requestBinlogSplitMetaIfNeeded(binlogSplit);
                 } else {
-                    uncompletedBinlogSplits.remove(split.splitId());
+                    uncompletedBinlogSplits.remove(binlogSplit.splitId());
                     MySqlBinlogSplit mySqlBinlogSplit =
                             discoverTableSchemasForBinlogSplit(
-                                    split.asBinlogSplit(),
-                                    sourceConfig,
-                                    checkNewlyAddedTableSchema);
+                                    binlogSplit, sourceConfig, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
+                LOG.info(
+                        "Source reader {} received the binlog split : {}.", subtaskId, binlogSplit);
+                context.sendSourceEventToCoordinator(new BinlogSplitAssignedEvent());
             }
         }
         // notify split enumerator again about the finished unacked snapshot splits
@@ -305,7 +333,7 @@ public class MySqlSourceReader<T>
             final MySqlBinlogSplit binlogSplit =
                     toNormalBinlogSplit(suspendedBinlogSplit, finishedSplitsSize);
             suspendedBinlogSplit = null;
-            this.addSplits(Collections.singletonList(binlogSplit));
+            this.addSplits(Collections.singletonList(binlogSplit), false);
 
             context.sendSourceEventToCoordinator(new BinlogSplitUpdateAckEvent());
             LOG.info(

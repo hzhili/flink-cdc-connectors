@@ -84,7 +84,15 @@ import java.util.function.Predicate;
 
 import static io.debezium.util.Strings.isNullOrEmpty;
 
-/** MySqlStreamingChangeEventSource. */
+/**
+ * Copied from Debezium project to fix
+ * https://github.com/ververica/flink-cdc-connectors/issues/1944.
+ *
+ * <p>Line 1427-1433 : Adjust GTID merging logic to support recovering from job which previously
+ * specifying starting offset on start.
+ *
+ * <p>Line 1485 : Add more error details for some exceptions.
+ */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
 
@@ -120,7 +128,7 @@ public class MySqlStreamingChangeEventSource
     @SingleThreadAccess("binlog client thread")
     private Instant eventTimestamp;
 
-    /** BinlogPosition. */
+    /** Describe binlog position. */
     public static class BinlogPosition {
         final String filename;
         final long position;
@@ -1537,7 +1545,7 @@ public class MySqlStreamingChangeEventSource
         return new DebeziumException(msg, error);
     }
 
-    /** ReaderThreadLifecycleListener. */
+    /** LifecycleListener for Reader Thread. */
     protected final class ReaderThreadLifecycleListener implements LifecycleListener {
         private final MySqlOffsetContext offsetContext;
 

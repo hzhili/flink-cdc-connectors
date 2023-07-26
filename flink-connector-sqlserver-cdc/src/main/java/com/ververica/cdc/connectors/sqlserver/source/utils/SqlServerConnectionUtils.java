@@ -19,8 +19,8 @@ package com.ververica.cdc.connectors.sqlserver.source.utils;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
-import io.debezium.connector.sqlserver.SqlServerValueConverters;
 import io.debezium.connector.sqlserver.SqlServerJdbcConfiguration;
+import io.debezium.connector.sqlserver.SqlServerValueConverters;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
@@ -49,11 +49,12 @@ public class SqlServerConnectionUtils {
                 SqlServerJdbcConfiguration.adapt(dbzConnectorConfig),
                 valueConverters,
                 connectorConfig.getSkippedOperations(),
-                ((SqlServerConnectorConfig)connectorConfig).useSingleDatabase(),
-                ((SqlServerConnectorConfig)connectorConfig).getOptionRecompile());
+                ((SqlServerConnectorConfig) connectorConfig).useSingleDatabase(),
+                ((SqlServerConnectorConfig) connectorConfig).getOptionRecompile());
     }
 
-    public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
+    public static List<TableId> listTables(
+            JdbcConnection jdbc, RelationalTableFilters tableFilters, List<String> databaseList)
             throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
@@ -67,7 +68,10 @@ public class SqlServerConnectionUtils {
                 "SELECT name, database_id, create_date  \n" + "FROM sys.databases;  ",
                 rs -> {
                     while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+                        String databaseName = rs.getString(1);
+                        if (databaseList.contains(databaseName)) {
+                            databaseNames.add(databaseName);
+                        }
                     }
                 });
         LOG.info("\t list of available databases is: {}", databaseNames);
@@ -85,7 +89,7 @@ public class SqlServerConnectionUtils {
                 jdbc.query(
                         "SELECT * FROM "
                                 + dbName
-                                + ".INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'  AND TABLE_NAME ='NREGIPATI';",
+                                + ".INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';",
                         rs -> {
                             while (rs.next()) {
                                 TableId tableId =

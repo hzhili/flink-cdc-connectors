@@ -20,7 +20,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-import com.ververica.cdc.connectors.oracle.source.OraclePooledDataSourceFactory;
 import io.debezium.config.Configuration;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -51,13 +50,7 @@ public class CatalogTest {
         props.put(DATABASE_NAME.key(), "HISDB");
         props.put(SCHEMA_NAME.key(), "BSHIS60");
         props.put("scan.startup.mode", "initial");
-        catalog =
-                new OracleCatalog(
-                        "oracle",
-                        "BSHIS60",
-                        new OracleCatalogFactory().createSourceConfig(Configuration.from(props)),
-                        new OraclePooledDataSourceFactory(),
-                        props);
+        catalog = new OracleCatalog("oracle", "BSHIS60", Configuration.from(props));
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
         //        env.setParallelism(1);
         this.tEnv =

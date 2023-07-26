@@ -12,3 +12,4 @@
 # limitations under the License.
 
 com.ververica.cdc.connectors.sqlserver.table.SqlServerTableFactory
+com.ververica.cdc.connectors.sqlserver.catalog.SqlServerCatalogFactory

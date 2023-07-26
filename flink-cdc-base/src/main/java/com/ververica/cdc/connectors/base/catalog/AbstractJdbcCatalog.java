@@ -63,7 +63,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Abstract jdbc catalog. */
 public abstract class AbstractJdbcCatalog extends AbstractCatalog {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractJdbcCatalog.class);
+    public final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
     protected JdbcConnection connection;
 
@@ -77,7 +77,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
             connection = getJdbcConnection();
             connection.connection();
             LOGGER.info("Catalog {} established connection to {}", getName(), getUrl());
-        } catch (SQLException e) {
+        } catch (Exception e) {
             throw new CatalogException(
                     String.format(
                             "Failed testing connection for %s with user '%s'",
@@ -162,13 +162,21 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
         String tableName = tablePath.getObjectName();
         Map<String, String> options = getTableOptions(tablePath);
 
-        return CatalogTable.of(
-                createTableSchema(databaseName, tableName), null, Lists.newArrayList(), options);
+        try {
+            return CatalogTable.of(
+                    createTableSchema(databaseName, tableName),
+                    null,
+                    Lists.newArrayList(),
+                    options);
+        } catch (SQLException e) {
+            throw new CatalogException("获取表异常", e);
+        }
     }
 
     public abstract Map<String, String> getTableOptions(ObjectPath tablePath);
 
-    public abstract Schema createTableSchema(String databaseName, String tableName);
+    public abstract Schema createTableSchema(String databaseName, String tableName)
+            throws SQLException;
 
     public abstract DataType convertColumnType(Column column);
 
@@ -178,7 +186,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
             return databaseExists(tablePath.getDatabaseName())
                     && listTables(tablePath.getDatabaseName()).contains(tablePath.getObjectName());
         } catch (DatabaseNotExistException e) {
-            return false;
+            throw new CatalogException(e);
         }
     }
 

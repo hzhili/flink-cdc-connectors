@@ -56,38 +56,38 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "sqlserver-cdc";
 
-    private static final ConfigOption<String> HOSTNAME =
+    public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("IP address or hostname of the SqlServer database server.");
 
-    private static final ConfigOption<Integer> PORT =
+    public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()
                     .defaultValue(1433)
                     .withDescription("Integer port number of the SqlServer database server.");
 
-    private static final ConfigOption<String> USERNAME =
+    public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "Name of the SqlServer database to use when connecting to the SqlServer database server.");
 
-    private static final ConfigOption<String> PASSWORD =
+    public static final ConfigOption<String> PASSWORD =
             ConfigOptions.key("password")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "Password to use when connecting to the SqlServer database server.");
 
-    private static final ConfigOption<String> DATABASE_NAME =
+    public static final ConfigOption<String> DATABASE_NAME =
             ConfigOptions.key("database-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Database name of the SqlServer server to monitor.");
-    private static final ConfigOption<String> TABLE_NAME =
+    public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")
                     .stringType()
                     .noDefaultValue()

@@ -20,20 +20,9 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-import io.debezium.config.Configuration;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
-import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
-import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
-import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
-import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 
 /** Oracle catalog test. */
 @Ignore
@@ -43,40 +32,54 @@ public class CatalogTest {
 
     @Before
     public void setup() {
-        Map<String, String> props = new HashMap<>();
-        props.put(HOSTNAME.key(), "172.16.89.33");
-        props.put(USERNAME.key(), "cdcuser");
-        props.put(PASSWORD.key(), "cdcuser");
-        props.put(DATABASE_NAME.key(), "HISDB");
-        props.put(SCHEMA_NAME.key(), "BSHIS60");
-        props.put("scan.startup.mode", "initial");
-        catalog = new OracleCatalog("oracle", "BSHIS60", Configuration.from(props));
+        //        Map<String, String> props = new HashMap<>();
+        //        props.put(HOSTNAME.key(), "192.168.0.240");
+        //        props.put(USERNAME.key(), "cdc_admin");
+        //        props.put(PASSWORD.key(), "Xyh@3613571@cdc");
+        //        props.put(DATABASE_NAME.key(), "orcl");
+        //        props.put(SCHEMA_NAME.key(), "BSHIS_JXFY");
+        //        catalog = new OracleCatalog("oracle", "BSHIS60", Configuration.from(props),null);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+        env.setParallelism(1);
         //        env.setParallelism(1);
         this.tEnv =
                 StreamTableEnvironment.create(
                         env, EnvironmentSettings.newInstance().inStreamingMode().build());
-        tEnv.registerCatalog("oracle", catalog);
-        tEnv.useCatalog("oracle");
+
+        //        tEnv.registerCatalog("oracle", catalog);
+        //        tEnv.useCatalog("oracle");
+        tEnv.executeSql(
+                "create catalog oraCatalog with("
+                        + " 'type'='oracle-ctl',"
+                        + " 'hostname' = '192.168.0.240',"
+                        + " 'username' = 'cdc_admin',"
+                        + " 'password' = 'Xyh@3613571@cdc',"
+                        + " 'database-name' = 'orcl',"
+                        + " 'schema-name' = 'BSHIS_JXFY'"
+                        + ")");
+        tEnv.executeSql("use catalog oraCatalog");
     }
 
     @Test
     public void testListDatabases() {
-        List<String> actual = catalog.listDatabases();
-        actual.forEach(System.out::println);
+        //        List<String> actual = catalog.listDatabases();
+        //        actual.forEach(System.out::println);
+        tEnv.executeSql("show databases;").print();
     }
 
     @Test
     public void testListTables() {
-        tEnv.executeSql("use BSHIS60");
+        tEnv.executeSql("use BSHIS_JXFY");
         tEnv.executeSql("show tables").print();
     }
 
     @Test
     public void testQuery() {
-        tEnv.executeSql("use BSHIS60");
+        tEnv.executeSql("use BSHIS_JXFY");
         tEnv.executeSql(
-                        "SELECT * FROM MZSF_CLININFO /*+OPTIONS('scan.startup.mode'='latest-offset')*/")
+                        "SELECT * FROM ZYYS_EMR_LIST /*+OPTIONS(\t 'debezium.log.mining.strategy'='online_catalog',\n"
+                                + "\t 'debezium.log.mining.continuous.mine'='true',\n"
+                                + "\t 'scan.incremental.close-idle-reader.enabled'='true')*/")
                 .print();
     }
 }

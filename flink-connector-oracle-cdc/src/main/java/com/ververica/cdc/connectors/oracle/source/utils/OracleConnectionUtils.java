@@ -31,9 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static io.debezium.config.CommonConnectorConfig.DATABASE_CONFIG_PREFIX;
 
@@ -44,7 +42,8 @@ public class OracleConnectionUtils {
 
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
-
+    /** Fetch Size */
+    private static final int FETCH_SIZE = 1024;
     /** show current scn sql in oracle. */
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
 
@@ -92,7 +91,7 @@ public class OracleConnectionUtils {
             throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
 
-        Set<TableId> tableIdSet = new HashSet<>();
+        //        Set<TableId> tableIdSet = new HashSet<>();
         String queryTablesSql =
                 "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
                         + "WHERE OWNER NOT IN ('SYSTEM','SYSAUX')";
@@ -101,26 +100,33 @@ public class OracleConnectionUtils {
             jdbcConnection.query(
                     queryTablesSql,
                     rs -> {
+                        rs.setFetchSize(FETCH_SIZE);
                         while (rs.next()) {
                             String schemaName = rs.getString(1);
                             String tableName = rs.getString(2);
                             TableId tableId =
                                     new TableId(jdbcConnection.database(), schemaName, tableName);
-                            tableIdSet.add(tableId);
+                            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+                                capturedTableIds.add(tableId);
+                                LOG.info("\t including '{}' for further processing", tableId);
+                            } else {
+                                LOG.debug("\t '{}' is filtered out of capturing", tableId);
+                            }
+                            //                            tableIdSet.add(tableId);
                         }
                     });
         } catch (SQLException e) {
             LOG.warn(" SQL execute error, sql:{}", queryTablesSql, e);
         }
 
-        for (TableId tableId : tableIdSet) {
-            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-                capturedTableIds.add(tableId);
-                LOG.info("\t including '{}' for further processing", tableId);
-            } else {
-                LOG.debug("\t '{}' is filtered out of capturing", tableId);
-            }
-        }
+        //        for (TableId tableId : tableIdSet) {
+        //            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+        //                capturedTableIds.add(tableId);
+        //                LOG.info("\t including '{}' for further processing", tableId);
+        //            } else {
+        //                LOG.debug("\t '{}' is filtered out of capturing", tableId);
+        //            }
+        //        }
 
         return capturedTableIds;
     }

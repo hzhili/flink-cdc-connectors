@@ -39,14 +39,11 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/** Oracle connection manager. copied form debezium 2.2.1.final
- * add {@link #readTableSchema(
- *             String databaseCatalog,
- *             String schemaNamePattern,
- *             String tableNamePattern,
- *             ColumnNameFilter columnFilter)
- *      } methode.
- * */
+/**
+ * Oracle connection manager. copied form debezium 2.2.1.final add {@link #readTableSchema( String
+ * databaseCatalog, String schemaNamePattern, String tableNamePattern, ColumnNameFilter
+ * columnFilter) } methode.
+ */
 public class OracleConnection extends JdbcConnection {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OracleConnection.class);
@@ -54,10 +51,8 @@ public class OracleConnection extends JdbcConnection {
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
 
-    /**
-     * Fetch size.
-     */
-    private static final int FETCH_SIZE=1024;
+    /** Fetch size. */
+    private static final int FETCH_SIZE = 1024;
 
     /** Pattern to identify system generated indices and column names. */
     private static final Pattern SYS_NC_PATTERN =

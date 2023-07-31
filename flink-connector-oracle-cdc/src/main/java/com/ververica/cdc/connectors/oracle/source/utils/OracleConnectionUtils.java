@@ -42,7 +42,7 @@ public class OracleConnectionUtils {
 
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
-    /** Fetch Size */
+    /** Fetch Size. */
     private static final int FETCH_SIZE = 1024;
     /** show current scn sql in oracle. */
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";

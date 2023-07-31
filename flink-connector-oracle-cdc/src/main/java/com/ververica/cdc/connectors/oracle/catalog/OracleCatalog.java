@@ -34,7 +34,6 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 
-
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +42,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
-import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 
 /** Oracle catalog implements,extends {@link AbstractJdbcCatalog }. */
 public class OracleCatalog extends AbstractJdbcCatalog {
@@ -98,9 +96,10 @@ public class OracleCatalog extends AbstractJdbcCatalog {
         Schema.Builder builder = Schema.newBuilder();
         columns.forEach(
                 column -> {
-                    builder.column(column.name(),convertColumnType(column)).withComment(column.comment());
+                    builder.column(column.name(), convertColumnType(column))
+                            .withComment(column.comment());
                 });
-        if (table.primaryKeyColumnNames().size()>0||!table.primaryKeyColumnNames().isEmpty()){
+        if (table.primaryKeyColumnNames().size() > 0 || !table.primaryKeyColumnNames().isEmpty()) {
             builder.primaryKey(table.primaryKeyColumnNames());
         }
         return builder.build();

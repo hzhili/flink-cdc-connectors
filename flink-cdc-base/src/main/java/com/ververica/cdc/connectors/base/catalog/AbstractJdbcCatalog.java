@@ -63,7 +63,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Abstract jdbc catalog. */
 public abstract class AbstractJdbcCatalog extends AbstractCatalog {
-    public final Logger LOGGER = LoggerFactory.getLogger(getClass());
+    public final Logger logger = LoggerFactory.getLogger(getClass());
 
     protected JdbcConnection connection;
 
@@ -76,7 +76,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
         try {
             connection = getJdbcConnection();
             connection.connection();
-            LOGGER.info("Catalog {} established connection to {}", getName(), getUrl());
+            logger.info("Catalog {} established connection to {}", getName(), getUrl());
         } catch (Exception e) {
             throw new CatalogException(
                     String.format(
@@ -98,7 +98,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
                 connection.close();
             }
             connection = null;
-            LOGGER.info("Closed catalog {} ", getName());
+            logger.info("Closed catalog {} ", getName());
         } catch (Exception e) {
             throw new CatalogException(String.format("Closing catalog %s failed.", getName()), e);
         }
@@ -184,7 +184,8 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     public boolean tableExists(ObjectPath tablePath) throws CatalogException {
         try {
             return databaseExists(tablePath.getDatabaseName())
-                    && listTables(tablePath.getDatabaseName()).contains(tablePath.getObjectName().toUpperCase());
+                    && listTables(tablePath.getDatabaseName())
+                            .contains(tablePath.getObjectName().toUpperCase());
         } catch (DatabaseNotExistException e) {
             throw new CatalogException(e);
         }

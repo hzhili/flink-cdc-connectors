@@ -70,9 +70,8 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
 
     @Override
     public Map<String, String> getTableOptions(ObjectPath tablePath) {
-        Map<String, String> options = configuration.asMap();
-        options.put(CONNECTOR.key(), "sqlserver-cdc");
-        options.put(TABLE_NAME.key(), tablePath.getObjectName());
+        Map<String, String> options = configuration.filter(key->!key.equalsIgnoreCase(SCHEMA_NAME.key())).asMap();
+        options.put(TABLE_NAME.key(), schemaName+"."+tablePath.getObjectName());
         return options;
     }
 
@@ -80,15 +79,14 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
     public Schema createTableSchema(String databaseName, String tableName) throws SQLException {
         Table table = sqlServerSchema.getTableSchema(connection, new TableId(databaseName, schemaName, tableName)).getTable();
         List<Column> columns = table.columns();
-        List<String> fieldNames = new ArrayList<>(columns.size());
-        List<DataType> fieldTypes = new ArrayList<>(columns.size());
+        Schema.Builder builder = Schema.newBuilder();
         columns.forEach(
                 column -> {
-                    fieldNames.add(column.name());
-                    fieldTypes.add(convertColumnType(column));
+                    builder.column(column.name(),convertColumnType(column)).withComment(column.comment());
                 });
-        Schema.Builder builder = Schema.newBuilder().fromFields(fieldNames, fieldTypes);
-        builder.primaryKey(table.primaryKeyColumnNames()).withComment(table.comment());
+        if (table.primaryKeyColumnNames().size()>0||!table.primaryKeyColumnNames().isEmpty()){
+            builder.primaryKey(table.primaryKeyColumnNames());
+        }
         return builder.build();
     }
 
@@ -100,7 +98,7 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
     @Override
     public List<String> listDatabases() throws CatalogException {
         try {
-            return new ArrayList<>(connection.readAllCatalogNames());
+            return connection.readAllCatalogNames().stream().map(String::toUpperCase).collect(Collectors.toList());
         } catch (SQLException e) {
             throw new CatalogException("获取数据库列表异常!!!", e);
         }
@@ -109,7 +107,7 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
     @Override
     public List<String> listTables(String databaseName) throws DatabaseNotExistException, CatalogException {
         try {
-            return connection.readTableNames(databaseName, schemaName, null, new String[]{"TABLE"}).stream().map(TableId::table).collect(Collectors.toList());
+            return connection.readTableNames(databaseName, schemaName, null, new String[]{"TABLE"}).stream().map(tableId -> tableId.table().toUpperCase()).collect(Collectors.toList());
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

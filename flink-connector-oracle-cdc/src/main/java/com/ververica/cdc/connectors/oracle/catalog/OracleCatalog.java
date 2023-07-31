@@ -81,7 +81,6 @@ public class OracleCatalog extends AbstractJdbcCatalog {
     @Override
     public Map<String, String> getTableOptions(ObjectPath tablePath) {
         Map<String, String> options = configuration.asMap();
-        options.put(CONNECTOR.key(), "oracle-cdc");
         options.put(TABLE_NAME.key(), tablePath.getObjectName());
         return options;
     }
@@ -96,15 +95,14 @@ public class OracleCatalog extends AbstractJdbcCatalog {
                                 new TableId(
                                         jdbcConfiguration.getDatabase(), databaseName, tableName));
         List<Column> columns = table.columns();
-        List<String> fieldNames = new ArrayList<>(columns.size());
-        List<DataType> fieldTypes = new ArrayList<>(columns.size());
+        Schema.Builder builder = Schema.newBuilder();
         columns.forEach(
                 column -> {
-                    fieldNames.add(column.name());
-                    fieldTypes.add(convertColumnType(column));
+                    builder.column(column.name(),convertColumnType(column)).withComment(column.comment());
                 });
-        Schema.Builder builder = Schema.newBuilder().fromFields(fieldNames, fieldTypes);
-        builder.primaryKey(table.primaryKeyColumnNames()).withComment(table.comment());
+        if (table.primaryKeyColumnNames().size()>0||!table.primaryKeyColumnNames().isEmpty()){
+            builder.primaryKey(table.primaryKeyColumnNames());
+        }
         return builder.build();
     }
 
@@ -129,8 +127,6 @@ public class OracleCatalog extends AbstractJdbcCatalog {
                         }
                         return databases.parallelStream().sorted().collect(Collectors.toList());
                     });
-            // return new ArrayList<>(connection.readAllSchemaNames(schema ->
-            // !ORACLE_SYSTEM_USER.contains(schema)));
         } catch (SQLException e) {
             throw new CatalogException("获取数据库列表异常!!!", e);
         }

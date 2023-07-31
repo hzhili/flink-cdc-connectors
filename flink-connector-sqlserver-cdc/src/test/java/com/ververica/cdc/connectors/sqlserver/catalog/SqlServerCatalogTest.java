@@ -39,16 +39,15 @@ public class SqlServerCatalogTest {
 
     @Test
     public void testListTables() {
-        tEnv.executeSql("use BSHIS_JXFY");
+        tEnv.executeSql("use HISDB");
         tEnv.executeSql("show tables").print();
     }
 
     @Test
     public void testQuery() {
-        tEnv.executeSql("use BSHIS_JXFY");
+        tEnv.executeSql("use HISDB");
         tEnv.executeSql(
-                        "SELECT * FROM ZYYS_EMR_LIST /*+OPTIONS(\t 'debezium.log.mining.strategy'='online_catalog',\n"
-                                + "\t 'debezium.log.mining.continuous.mine'='true',\n"
+                        "SELECT * FROM NREGIPATI /*+OPTIONS("
                                 + "\t 'scan.incremental.close-idle-reader.enabled'='true')*/")
                 .print();
     }

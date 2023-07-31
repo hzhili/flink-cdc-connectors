@@ -125,7 +125,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     public boolean databaseExists(String databaseName) throws CatalogException {
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(databaseName));
 
-        return listDatabases().contains(databaseName);
+        return listDatabases().contains(databaseName.toUpperCase());
     }
 
     @Override
@@ -184,7 +184,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     public boolean tableExists(ObjectPath tablePath) throws CatalogException {
         try {
             return databaseExists(tablePath.getDatabaseName())
-                    && listTables(tablePath.getDatabaseName()).contains(tablePath.getObjectName());
+                    && listTables(tablePath.getDatabaseName()).contains(tablePath.getObjectName().toUpperCase());
         } catch (DatabaseNotExistException e) {
             throw new CatalogException(e);
         }

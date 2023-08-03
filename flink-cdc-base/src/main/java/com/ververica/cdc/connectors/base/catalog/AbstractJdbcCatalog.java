@@ -114,7 +114,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     @Override
     public CatalogDatabase getDatabase(String databaseName)
             throws DatabaseNotExistException, CatalogException {
-        if (listDatabases().contains(databaseName)) {
+        if (listDatabases().contains(databaseName.toUpperCase())) {
             return new CatalogDatabaseImpl(Collections.emptyMap(), null);
         } else {
             throw new DatabaseNotExistException(getName(), databaseName);
@@ -186,7 +186,7 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
             return databaseExists(tablePath.getDatabaseName())
                     && listTables(tablePath.getDatabaseName())
                             .contains(tablePath.getObjectName().toUpperCase());
-        } catch (DatabaseNotExistException e) {
+        } catch (Exception e) {
             throw new CatalogException(e);
         }
     }

@@ -18,6 +18,8 @@ package com.ververica.cdc.connectors.sqlserver.source.utils;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.table.types.logical.TimestampType;
 
 import io.debezium.relational.Column;
 
@@ -60,13 +62,19 @@ public class SqlServerTypeUtils {
             case Types.DOUBLE:
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                int scale = column.scale().orElse(0);
+                if (column.length() > 38 || scale > 38) {
+                    return DataTypes.STRING();
+                }
+                return DataTypes.DECIMAL(
+                        column.length() > 0 ? column.length() : DecimalType.MAX_PRECISION, scale);
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
             case Types.TIMESTAMP_WITH_TIMEZONE:
                 return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
+                        ? DataTypes.TIMESTAMP(
+                                Math.min(column.length(), TimestampType.MAX_PRECISION))
                         : DataTypes.TIMESTAMP();
             case Types.BOOLEAN:
                 return DataTypes.BOOLEAN();

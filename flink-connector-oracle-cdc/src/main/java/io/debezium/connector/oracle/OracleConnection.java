@@ -6,6 +6,8 @@
 
 package io.debezium.connector.oracle;
 
+import org.apache.flink.shaded.guava30.com.google.common.collect.Sets;
+
 import io.debezium.DebeziumException;
 import io.debezium.config.Field;
 import io.debezium.connector.oracle.OracleConnectorConfig.ConnectorAdapter;
@@ -310,7 +312,7 @@ public class OracleConnection extends JdbcConnection {
                             null,
                             columnFilter,
                             metadata,
-                            null);
+                            Sets.newHashSet());
             columnsByTable.putAll(cols);
         }
         // Read the metadata for the primary keys ...

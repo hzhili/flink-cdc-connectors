@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.sqlserver.catalog;
 
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.TableNotExistException;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
@@ -36,6 +37,7 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -100,11 +102,24 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
 
     @Override
     public Schema createTableSchema(String databaseName, String tableName) throws SQLException {
-        Table table =
-                sqlServerSchema
-                        .getTableSchema(
-                                connection, new TableId(databaseName, schemaName, tableName))
-                        .getTable();
+        Tables tables = new Tables();
+        Table table = null;
+        TableId tableId = new TableId(databaseName, schemaName, tableName);
+        connection.readSchema(
+                tables,
+                databaseName,
+                schemaName,
+                tableId1 -> tableId1.compareToIgnoreCase(tableId) == 0,
+                null,
+                true);
+        for (TableId id : tables.tableIds()) {
+            if (id.compareToIgnoreCase(tableId) == 0) {
+                table = tables.forTable(tableId);
+            }
+        }
+        if (table == null) {
+            throw new TableNotExistException(getName(), tableName);
+        }
         List<Column> columns = table.columns();
         Schema.Builder builder = Schema.newBuilder();
         columns.forEach(

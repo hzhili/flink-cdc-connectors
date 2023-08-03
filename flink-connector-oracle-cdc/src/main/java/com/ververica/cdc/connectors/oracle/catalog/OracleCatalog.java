@@ -79,7 +79,7 @@ public class OracleCatalog extends AbstractJdbcCatalog {
     @Override
     public Map<String, String> getTableOptions(ObjectPath tablePath) {
         Map<String, String> options = configuration.asMap();
-        options.put(TABLE_NAME.key(), tablePath.getObjectName());
+        options.put(TABLE_NAME.key(), tablePath.getObjectName().toUpperCase());
         return options;
     }
 
@@ -88,10 +88,15 @@ public class OracleCatalog extends AbstractJdbcCatalog {
         Table table =
                 ((OracleConnection) connection)
                         .readTableSchema(
-                                jdbcConfiguration.getDatabase(), databaseName, tableName, null)
+                                jdbcConfiguration.getDatabase().toUpperCase(),
+                                databaseName.toUpperCase(),
+                                tableName.toUpperCase(),
+                                null)
                         .forTable(
                                 new TableId(
-                                        jdbcConfiguration.getDatabase(), databaseName, tableName));
+                                        jdbcConfiguration.getDatabase().toUpperCase(),
+                                        databaseName.toUpperCase(),
+                                        tableName.toUpperCase()));
         List<Column> columns = table.columns();
         Schema.Builder builder = Schema.newBuilder();
         columns.forEach(
@@ -139,7 +144,7 @@ public class OracleCatalog extends AbstractJdbcCatalog {
             return connection.prepareQueryAndMap(
                     queryAllTableSql,
                     ps -> {
-                        ps.setString(1, databaseName);
+                        ps.setString(1, databaseName.toUpperCase());
                         ps.setFetchSize(FETCH_SIZE);
                     },
                     rs -> {

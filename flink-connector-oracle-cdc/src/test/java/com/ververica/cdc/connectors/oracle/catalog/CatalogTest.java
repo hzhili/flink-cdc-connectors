@@ -57,7 +57,7 @@ public class CatalogTest {
                         + " 'database-name' = 'orcl',"
                         + " 'schema-name' = 'BSHIS_JXFY'"
                         + ")");
-        tEnv.executeSql("use catalog oraCatalog");
+        //        tEnv.executeSql("use catalog oraCatalog");
     }
 
     @Test
@@ -75,9 +75,9 @@ public class CatalogTest {
 
     @Test
     public void testQuery() {
-        tEnv.executeSql("use BSHIS_JXFY");
+        //        tEnv.executeSql("use BSHIS_JXFY");
         tEnv.executeSql(
-                        "SELECT * FROM ZYYS_EMR_LIST /*+OPTIONS(\t 'debezium.log.mining.strategy'='online_catalog',\n"
+                        "SELECT * FROM oraCatalog.bshis_jxfy.ZYYS_EMR_LIST_DETAIL /*+OPTIONS(\t 'debezium.log.mining.strategy'='online_catalog',\n"
                                 + "\t 'debezium.log.mining.continuous.mine'='true',\n"
                                 + "\t 'scan.incremental.close-idle-reader.enabled'='true')*/")
                 .print();

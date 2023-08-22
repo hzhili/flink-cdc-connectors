@@ -94,6 +94,26 @@ public enum SqlServerReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
                 }
+            }),
+    /** 表示该行数据是什么操作，I 新增，U 修改，D 删除. */
+    OP(
+            "op",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    String operation = messageStruct.getString(Envelope.FieldName.OPERATION);
+                    switch (operation) {
+                        case "r":
+                        case "c":
+                            return StringData.fromString("I");
+                        default:
+                            return StringData.fromString(operation.toUpperCase());
+                    }
+                }
             });
 
     private final String key;

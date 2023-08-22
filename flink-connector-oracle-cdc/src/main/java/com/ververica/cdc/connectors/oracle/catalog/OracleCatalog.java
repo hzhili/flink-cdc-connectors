@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.oracle.catalog;
 
+import com.ververica.cdc.connectors.oracle.table.OracleReadableMetaData;
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -35,21 +37,37 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.catalog.JdbcCatalogOptions.ENABLE_METADATA_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 
-/** Oracle catalog implements,extends {@link AbstractJdbcCatalog }. */
+/**
+ * Oracle catalog implements,extends {@link AbstractJdbcCatalog }.
+ */
 public class OracleCatalog extends AbstractJdbcCatalog {
     private static final List<String> ORACLE_SYSTEM_USER =
             Arrays.asList("SYS", "SYSTEM", "SYSAUX", "SYSMAN", "DBSNMP", "OUTLN", "APPQOSSYS");
+
+    public static final String ALL_DATABASES;
     private static final int FETCH_SIZE = 1024;
     private final Configuration configuration;
     private final JdbcConfiguration jdbcConfiguration;
+    private final Boolean showMetadataCol;
+
+    static {
+        StringBuilder query = new StringBuilder("SELECT USERNAME FROM DBA_USERS WHERE ACCOUNT_STATUS='OPEN' "
+                + "AND USERNAME NOT IN (");
+        for (Iterator<String> i = OracleConnectorConfig.EXCLUDED_SCHEMAS.iterator(); i.hasNext(); ) {
+            String excludedSchema = i.next();
+            query.append('\'').append(excludedSchema.toUpperCase()).append('\'');
+            if (i.hasNext()) {
+                query.append(',');
+            }
+        }
+        ALL_DATABASES = query.append(')').toString();
+    }
 
     public OracleCatalog(
             String name,
@@ -59,6 +77,7 @@ public class OracleCatalog extends AbstractJdbcCatalog {
         super(name, defaultDatabase);
         this.configuration = configuration;
         this.jdbcConfiguration = jdbcConfiguration;
+        this.showMetadataCol = configuration.getBoolean(ENABLE_METADATA_COLUMN.key());
     }
 
     @Override
@@ -99,6 +118,28 @@ public class OracleCatalog extends AbstractJdbcCatalog {
                                         tableName.toUpperCase()));
         List<Column> columns = table.columns();
         Schema.Builder builder = Schema.newBuilder();
+        if (showMetadataCol) {
+            builder.columnByMetadata(
+                            "metadata_database_name",
+                            OracleReadableMetaData.DATABASE_NAME.getDataType(),
+                            OracleReadableMetaData.DATABASE_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_schema_name",
+                            OracleReadableMetaData.SCHEMA_NAME.getDataType(),
+                            OracleReadableMetaData.SCHEMA_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_table_name",
+                            OracleReadableMetaData.TABLE_NAME.getDataType(),
+                            OracleReadableMetaData.TABLE_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_op_ts",
+                            OracleReadableMetaData.OP_TS.getDataType(),
+                            OracleReadableMetaData.OP_TS.getKey())
+                    .columnByMetadata(
+                            "metadata_op",
+                            OracleReadableMetaData.OP.getDataType(),
+                            OracleReadableMetaData.OP.getKey());
+        }
         columns.forEach(
                 column -> {
                     builder.column(column.name(), convertColumnType(column))
@@ -117,12 +158,9 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 
     @Override
     public List<String> listDatabases() throws CatalogException {
-        String query =
-                "SELECT USERNAME FROM DBA_USERS WHERE ACCOUNT_STATUS='OPEN' "
-                        + "AND USERNAME NOT IN ('SYS', 'SYSTEM', 'SYSAUX', 'SYSMAN', 'DBSNMP', 'OUTLN', 'APPQOSSYS')";
         try {
             return connection.queryAndMap(
-                    query,
+                    ALL_DATABASES,
                     rs -> {
                         List<String> databases = new ArrayList<>();
                         rs.setFetchSize(FETCH_SIZE);

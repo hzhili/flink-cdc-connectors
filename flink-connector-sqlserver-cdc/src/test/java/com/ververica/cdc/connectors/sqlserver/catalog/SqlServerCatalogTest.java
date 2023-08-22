@@ -45,7 +45,8 @@ public class SqlServerCatalogTest {
                         + " 'database-name' = 'hisdb',"
                         + " 'schema-name' = 'dbo',"
                         + " 'debezium.database.encrypt'='false',"
-                        + " 'debezium.database.connectTimeout'='60000'"
+                        + " 'debezium.database.connectTimeout'='60000',"
+                        + " 'enable.metadata.column'='true'"
                         + ")");
         tEnv.executeSql("use catalog mssqlCatalog");
     }
@@ -70,5 +71,11 @@ public class SqlServerCatalogTest {
                         "SELECT * FROM NREGIPATI /*+OPTIONS("
                                 + "\t 'scan.incremental.close-idle-reader.enabled'='true')*/")
                 .print();
+    }
+
+    @Test
+    public void testDesc() {
+        tEnv.executeSql("use hisdb");
+        tEnv.executeSql("desc NREGIPATI").print();
     }
 }

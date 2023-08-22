@@ -78,6 +78,27 @@ public enum OceanBaseReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             record.getSourceInfo().getTimestampS() * 1000);
                 }
+            }),
+    /** 表示该行数据是什么操作，I 新增，U 修改，D 删除. */
+    OP(
+            "op",
+            DataTypes.STRING(),
+            new OceanBaseMetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(OceanBaseRecord record) {
+                    switch (record.getOpt()) {
+                        case INSERT:
+                            return StringData.fromString("I");
+                        case UPDATE:
+                            return StringData.fromString("U");
+                        case DELETE:
+                            return StringData.fromString("D");
+                        default:
+                            return StringData.fromString(record.getOpt().toString());
+                    }
+                }
             });
 
     private final String key;

@@ -27,6 +27,7 @@ import org.apache.flink.table.types.DataType;
 import com.ververica.cdc.connectors.base.catalog.AbstractJdbcCatalog;
 import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerSchema;
 import com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerTypeUtils;
+import com.ververica.cdc.connectors.sqlserver.table.SqlServerReadableMetadata;
 import com.ververica.cdc.connectors.sqlserver.table.SqlServerTableFactory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.catalog.JdbcCatalogOptions.ENABLE_METADATA_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 
@@ -54,6 +56,7 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
     private final String schemaName;
 
     private final SqlServerSchema sqlServerSchema;
+    private final Boolean showMetadataCol;
 
     public SqlServerCatalog(
             String name,
@@ -65,6 +68,7 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
         this.schemaName = configuration.getString(SCHEMA_NAME.key());
         this.sqlServerSchema = new SqlServerSchema();
         this.jdbcConfiguration = jdbcConfiguration;
+        this.showMetadataCol = configuration.getBoolean(ENABLE_METADATA_COLUMN.key());
     }
 
     @Override
@@ -95,7 +99,13 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
     @Override
     public Map<String, String> getTableOptions(ObjectPath tablePath) {
         Map<String, String> options =
-                configuration.filter(key -> !key.equalsIgnoreCase(SCHEMA_NAME.key())).asMap();
+                configuration
+                        .filter(
+                                key ->
+                                        !key.equalsIgnoreCase(SCHEMA_NAME.key())
+                                                && !key.equalsIgnoreCase(
+                                                        ENABLE_METADATA_COLUMN.key()))
+                        .asMap();
         options.put(TABLE_NAME.key(), schemaName + "." + tablePath.getObjectName());
         return options;
     }
@@ -114,19 +124,42 @@ public class SqlServerCatalog extends AbstractJdbcCatalog {
                 true);
         for (TableId id : tables.tableIds()) {
             if (id.compareToIgnoreCase(tableId) == 0) {
-                table = tables.forTable(tableId);
+                table = tables.forTable(id);
             }
         }
         if (table == null) {
-            throw new TableNotExistException(getName(), tableName);
+            throw new TableNotExistException(getName(), databaseName + "." + tableName);
         }
         List<Column> columns = table.columns();
         Schema.Builder builder = Schema.newBuilder();
+        if (showMetadataCol) {
+            builder.columnByMetadata(
+                            "metadata_database_name",
+                            SqlServerReadableMetadata.DATABASE_NAME.getDataType(),
+                            SqlServerReadableMetadata.DATABASE_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_schema_name",
+                            SqlServerReadableMetadata.SCHEMA_NAME.getDataType(),
+                            SqlServerReadableMetadata.SCHEMA_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_table_name",
+                            SqlServerReadableMetadata.TABLE_NAME.getDataType(),
+                            SqlServerReadableMetadata.TABLE_NAME.getKey())
+                    .columnByMetadata(
+                            "metadata_op_ts",
+                            SqlServerReadableMetadata.OP_TS.getDataType(),
+                            SqlServerReadableMetadata.OP_TS.getKey())
+                    .columnByMetadata(
+                            "metadata_op",
+                            SqlServerReadableMetadata.OP.getDataType(),
+                            SqlServerReadableMetadata.OP.getKey());
+        }
         columns.forEach(
                 column -> {
                     builder.column(column.name(), convertColumnType(column))
                             .withComment(column.comment());
                 });
+
         if (table.primaryKeyColumnNames().size() > 0 || !table.primaryKeyColumnNames().isEmpty()) {
             builder.primaryKey(table.primaryKeyColumnNames());
         }

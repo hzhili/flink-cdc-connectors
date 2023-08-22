@@ -28,6 +28,7 @@ import io.debezium.connector.sqlserver.SqlServerJdbcConfiguration;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.base.catalog.JdbcCatalogOptions.ENABLE_METADATA_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
@@ -120,6 +121,7 @@ public class SqlServerCatalogFactory implements CatalogFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(ENABLE_METADATA_COLUMN);
         return options;
     }
 }

@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.connectors.oracle.catalog;
 
-import com.ververica.cdc.connectors.oracle.table.OracleReadableMetaData;
-import io.debezium.connector.oracle.OracleConnectorConfig;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -27,9 +25,11 @@ import org.apache.flink.table.types.DataType;
 
 import com.ververica.cdc.connectors.base.catalog.AbstractJdbcCatalog;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
+import com.ververica.cdc.connectors.oracle.table.OracleReadableMetaData;
 import com.ververica.cdc.connectors.oracle.table.OracleTableSourceFactory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
@@ -37,15 +37,17 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.catalog.JdbcCatalogOptions.ENABLE_METADATA_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 
-/**
- * Oracle catalog implements,extends {@link AbstractJdbcCatalog }.
- */
+/** Oracle catalog implements,extends {@link AbstractJdbcCatalog }. */
 public class OracleCatalog extends AbstractJdbcCatalog {
     private static final List<String> ORACLE_SYSTEM_USER =
             Arrays.asList("SYS", "SYSTEM", "SYSAUX", "SYSMAN", "DBSNMP", "OUTLN", "APPQOSSYS");
@@ -57,9 +59,12 @@ public class OracleCatalog extends AbstractJdbcCatalog {
     private final Boolean showMetadataCol;
 
     static {
-        StringBuilder query = new StringBuilder("SELECT USERNAME FROM DBA_USERS WHERE ACCOUNT_STATUS='OPEN' "
-                + "AND USERNAME NOT IN (");
-        for (Iterator<String> i = OracleConnectorConfig.EXCLUDED_SCHEMAS.iterator(); i.hasNext(); ) {
+        StringBuilder query =
+                new StringBuilder(
+                        "SELECT USERNAME FROM DBA_USERS WHERE ACCOUNT_STATUS='OPEN' "
+                                + "AND USERNAME NOT IN (");
+        for (Iterator<String> i = OracleConnectorConfig.EXCLUDED_SCHEMAS.iterator();
+                i.hasNext(); ) {
             String excludedSchema = i.next();
             query.append('\'').append(excludedSchema.toUpperCase()).append('\'');
             if (i.hasNext()) {
@@ -97,7 +102,10 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 
     @Override
     public Map<String, String> getTableOptions(ObjectPath tablePath) {
-        Map<String, String> options = configuration.asMap();
+        Map<String, String> options =
+                configuration
+                        .filter(key -> !key.equalsIgnoreCase(ENABLE_METADATA_COLUMN.key()))
+                        .asMap();
         options.put(TABLE_NAME.key(), tablePath.getObjectName().toUpperCase());
         return options;
     }

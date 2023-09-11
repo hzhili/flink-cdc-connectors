@@ -76,7 +76,7 @@ public class OracleTypeUtils {
             case Types.TIMESTAMP_WITH_TIMEZONE:
             case OracleTypes.TIMESTAMPTZ:
             case OracleTypes.TIMESTAMPLTZ:
-                return column.length() >= 0
+                return column.length() >= 0 && column.length() <= 9
                         ? DataTypes.TIMESTAMP(column.length())
                         : DataTypes.TIMESTAMP();
             case OracleTypes.INTERVALYM:

@@ -69,7 +69,9 @@ public class SqlServerConnectionUtils {
                 rs -> {
                     while (rs.next()) {
                         String databaseName = rs.getString(1);
-                        if (databaseList.contains(databaseName)) {
+                        if (databaseList.contains(databaseName.toUpperCase())
+                                || databaseList.contains(databaseName.toLowerCase())
+                                || databaseList.contains(databaseName)) {
                             databaseNames.add(databaseName);
                         }
                     }

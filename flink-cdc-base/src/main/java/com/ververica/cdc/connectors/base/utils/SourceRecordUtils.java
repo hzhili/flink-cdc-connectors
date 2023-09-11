@@ -102,6 +102,9 @@ public class SourceRecordUtils {
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
         Struct value = (Struct) sourceRecord.value();
+        if (value == null) {
+            return false;
+        }
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         if (source == null) {
             return false;

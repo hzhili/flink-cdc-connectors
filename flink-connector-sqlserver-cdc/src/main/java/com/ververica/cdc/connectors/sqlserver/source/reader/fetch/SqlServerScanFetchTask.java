@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask.LsnSplitReadTask;
 import io.debezium.DebeziumException;
@@ -80,6 +81,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
         taskRunning = true;
         snapshotSplitReadTask =
                 new SqlServerSnapshotSplitReadTask(
+                        sourceFetchContext.getSourceConfig(),
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getOffsetContext(),
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
@@ -212,7 +214,10 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
         private final SnapshotProgressListener<SqlServerPartition> snapshotProgressListener;
         private final EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver;
 
+        private final SqlServerSourceConfig sourceConfig;
+
         public SqlServerSnapshotSplitReadTask(
+                SqlServerSourceConfig sourceConfig,
                 SqlServerConnectorConfig connectorConfig,
                 SqlServerOffsetContext previousOffset,
                 SnapshotProgressListener<SqlServerPartition> snapshotProgressListener,
@@ -222,6 +227,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                 EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
+            this.sourceConfig=sourceConfig;
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -349,7 +355,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                                     snapshotSplit.getSplitStart(),
                                     snapshotSplit.getSplitEnd(),
                                     snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getQueryFetchSize());
+                                    sourceConfig.getFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);

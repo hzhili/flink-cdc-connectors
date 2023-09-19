@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
@@ -95,6 +96,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         taskRunning = true;
         snapshotSplitReadTask =
                 new OracleSnapshotSplitReadTask(
+                        sourceFetchContext.getSourceConfig(),
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getOffsetContext(),
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
@@ -213,8 +215,10 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         private final SnapshotSplit snapshotSplit;
         private final OracleOffsetContext offsetContext;
         private final SnapshotProgressListener<OraclePartition> snapshotProgressListener;
+        private final OracleSourceConfig sourceConfig;
 
         public OracleSnapshotSplitReadTask(
+                OracleSourceConfig sourceConfig,
                 OracleConnectorConfig connectorConfig,
                 OracleOffsetContext previousOffset,
                 SnapshotProgressListener<OraclePartition> snapshotProgressListener,
@@ -223,6 +227,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 JdbcSourceEventDispatcher<OraclePartition> dispatcher,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
+            this.sourceConfig=sourceConfig;
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -361,7 +366,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                                     snapshotSplit.getSplitStart(),
                                     snapshotSplit.getSplitEnd(),
                                     snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getQueryFetchSize());
+                                    sourceConfig.getFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);

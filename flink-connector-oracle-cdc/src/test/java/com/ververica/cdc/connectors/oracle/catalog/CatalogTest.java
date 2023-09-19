@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.oracle.catalog;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 import org.junit.Before;
@@ -49,14 +50,16 @@ public class CatalogTest {
         //        tEnv.registerCatalog("oracle", catalog);
         //        tEnv.useCatalog("oracle");
         tEnv.executeSql(
-                "create catalog oraCatalog with("
-                        + " 'type'='oracle-ctl',"
-                        + " 'hostname' = '192.168.0.240',"
-                        + " 'username' = 'cdc_admin',"
-                        + " 'password' = 'Xyh@3613571@cdc',"
-                        + " 'database-name' = 'orcl',"
-                        + " 'schema-name' = 'BSHIS_JXFY'"
-                        + ")");
+                "create catalog oraCatalog with(\n"
+                        + "  'type'='oracle-ctl',\n"
+                        + "  'hostname'='192.168.0.32',\n"
+                        + "  'port'='1521',\n"
+                        + "  'username'='CDC_ADMIN',\n"
+                        + "  'password'='Xyh@3613571@cdc',\n"
+                        + "  'database-name'='ORCL',\n"
+                        + "  'schema-name'='BSHIS2020_EY',\n"
+                        + "  'enable.metadata.column'='true'\n"
+                        + ");");
         //        tEnv.executeSql("use catalog oraCatalog");
     }
 
@@ -76,10 +79,12 @@ public class CatalogTest {
     @Test
     public void testQuery() {
         //        tEnv.executeSql("use BSHIS_JXFY");
-        tEnv.executeSql(
-                        "SELECT * FROM oraCatalog.bshis_jxfy.ZYYS_EMR_LIST_DETAIL /*+OPTIONS(\t 'debezium.log.mining.strategy'='online_catalog',\n"
-                                + "\t 'debezium.log.mining.continuous.mine'='true',\n"
-                                + "\t 'scan.incremental.close-idle-reader.enabled'='true')*/")
-                .print();
+        TableResult tableResult =
+                tEnv.executeSql(
+                        "SELECT cast(WORD as string)"
+                                + " FROM oraCatalog.BSHIS2020_EY.ZYYS_EMR_LIST /*+OPTIONS('debezium.log.mining.strategy'='online_catalog',\n"
+                                + "                                'scan.incremental.close-idle-reader.enabled'='true',\n"
+                                + "\t\t\t\t\t\t\t\t'debezium.lob.enabled'='true')*/");
+        tableResult.print();
     }
 }

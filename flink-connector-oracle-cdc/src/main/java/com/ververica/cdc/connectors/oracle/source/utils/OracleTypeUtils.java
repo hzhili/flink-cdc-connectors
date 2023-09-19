@@ -66,7 +66,7 @@ public class OracleTypeUtils {
             case Types.NUMERIC:
             case Types.DECIMAL:
                 int scale = column.scale().orElse(0);
-                if (column.length() > 38 || scale > 38) {
+                if (column.length() > 38 || scale > column.length()) {
                     return DataTypes.STRING();
                 }
                 return DataTypes.DECIMAL(column.length() > 0 ? column.length() : 38, scale);

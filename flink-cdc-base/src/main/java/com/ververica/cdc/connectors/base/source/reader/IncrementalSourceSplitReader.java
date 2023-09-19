@@ -98,7 +98,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
 
     @Override
     public void close() throws Exception {
-        if (currentFetcher != null || currentFetcher.isFinished()) {
+        if (currentFetcher != null) {
             LOG.info("Close current fetcher {}", currentFetcher.getClass().getCanonicalName());
             currentFetcher.close();
             currentSplitId = null;

@@ -101,22 +101,9 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        Struct value = (Struct) sourceRecord.value();
-        if (value == null) {
-            return false;
-        }
-        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-        if (source == null) {
-            return false;
-        }
-        String connector = source.getString("connector");
-        String schemaName =
-                String.format(
-                        "%s%s%s",
-                        SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX,
-                        connector,
-                        SCHEMA_HISTORY_CONNECTOR_KEY_SCHEMA_NAME_SUFFIX);
-        return keySchema != null && schemaName.equalsIgnoreCase(keySchema.name());
+        return keySchema != null
+                && keySchema.name().startsWith(SCHEMA_HISTORY_CONNECTOR_SCHEMA_NAME_PREFIX)
+                && keySchema.name().endsWith(SCHEMA_HISTORY_CONNECTOR_KEY_SCHEMA_NAME_SUFFIX);
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {

@@ -227,7 +227,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                 EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
-            this.sourceConfig=sourceConfig;
+            this.sourceConfig = sourceConfig;
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;

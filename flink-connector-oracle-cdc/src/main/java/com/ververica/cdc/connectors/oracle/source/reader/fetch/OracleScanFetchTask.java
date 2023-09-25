@@ -227,7 +227,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 JdbcSourceEventDispatcher<OraclePartition> dispatcher,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
-            this.sourceConfig=sourceConfig;
+            this.sourceConfig = sourceConfig;
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;

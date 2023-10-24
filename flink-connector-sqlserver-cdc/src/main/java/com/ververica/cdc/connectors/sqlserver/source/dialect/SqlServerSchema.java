@@ -63,7 +63,12 @@ public class SqlServerSchema {
 
         try {
             sqlServerConnection.readSchema(
-                    tables, tableId.catalog(), tableId.schema(), null, null, false);
+                    tables,
+                    tableId.catalog(),
+                    tableId.schema(),
+                    id -> id.compareToIgnoreCase(tableId) == 0,
+                    null,
+                    false);
             Table table = tables.forTable(tableId);
             TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
             tableChangeMap.put(tableId, tableChange);

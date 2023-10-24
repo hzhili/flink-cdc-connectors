@@ -39,11 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
-/**
- * {@link JdbcConnection} extension to be used with Microsoft SQL Server
- *
- * @author Horia Chiorean (hchiorea@redhat.com), Jiri Pechanec
- */
+/** {@link JdbcConnection} extension to be used with Microsoft SQL Server. */
 public class SqlServerConnection extends JdbcConnection {
 
     public static final String INSTANCE_NAME = "instance";
@@ -56,18 +52,18 @@ public class SqlServerConnection extends JdbcConnection {
     private static final String DATABASE_NAME_PLACEHOLDER = "#db";
     private static final String GET_MAX_LSN = "SELECT [#db].sys.fn_cdc_get_max_lsn()";
     private static final String GET_MAX_TRANSACTION_LSN =
-            "SELECT MAX(start_lsn) FROM [#db].cdc.lsn_time_mapping WHERE tran_id <> 0x00";
+            "SELECT MAX(start_lsn) FROM [#db].cdc.lsn_time_mapping with (nolock) WHERE tran_id <> 0x00";
     private static final String GET_NTH_TRANSACTION_LSN_FROM_BEGINNING =
-            "SELECT MAX(start_lsn) FROM (SELECT TOP (?) start_lsn FROM [#db].cdc.lsn_time_mapping WHERE tran_id <> 0x00 ORDER BY start_lsn) as next_lsns";
+            "SELECT MAX(start_lsn) FROM (SELECT TOP (?) start_lsn FROM [#db].cdc.lsn_time_mapping with (nolock) WHERE tran_id <> 0x00 ORDER BY start_lsn) as next_lsns";
     private static final String GET_NTH_TRANSACTION_LSN_FROM_LAST =
-            "SELECT MAX(start_lsn) FROM (SELECT TOP (? + 1) start_lsn FROM [#db].cdc.lsn_time_mapping WHERE start_lsn >= ? AND tran_id <> 0x00 ORDER BY start_lsn) as next_lsns";
+            "SELECT MAX(start_lsn) FROM (SELECT TOP (? + 1) start_lsn FROM [#db].cdc.lsn_time_mapping with (nolock) WHERE start_lsn >= ? AND tran_id <> 0x00 ORDER BY start_lsn) as next_lsns";
 
     private static final String GET_MIN_LSN = "SELECT [#db].sys.fn_cdc_get_min_lsn('#')";
     private static final String LOCK_TABLE = "SELECT * FROM [#] WITH (TABLOCKX)";
     private static final String INCREMENT_LSN = "SELECT [#db].sys.fn_cdc_increment_lsn(?)";
     private static final String GET_ALL_CHANGES_FOR_TABLE =
             "SELECT *# FROM [#db].cdc.[fn_cdc_get_all_changes_#](?, ?, N'all update old') order by [__$start_lsn] ASC, [__$seqval] ASC, [__$operation] ASC";
-    private final String get_all_changes_for_table;
+    private final String getAllChangesForTableTemp;
     protected static final String LSN_TIMESTAMP_SELECT_STATEMENT =
             "TODATETIMEOFFSET([#db].sys.fn_cdc_map_lsn_to_time([__$start_lsn]), DATEPART(TZOFFSET, SYSDATETIMEOFFSET()))";
 
@@ -77,7 +73,7 @@ public class SqlServerConnection extends JdbcConnection {
      */
     private static final String GET_CAPTURED_COLUMNS =
             "SELECT object_id, column_name"
-                    + " FROM [#db].cdc.captured_columns"
+                    + " FROM [#db].cdc.captured_columns with (nolock)"
                     + " ORDER BY object_id, column_id";
 
     /**
@@ -94,7 +90,7 @@ public class SqlServerConnection extends JdbcConnection {
             "WITH ordered_change_tables"
                     + " AS (SELECT ROW_NUMBER() OVER (PARTITION BY ct.source_object_id, ct.start_lsn ORDER BY ct.create_date DESC) AS ct_sequence,"
                     + " ct.*"
-                    + " FROM [#db].cdc.change_tables AS ct#)"
+                    + " FROM [#db].cdc.change_tables AS ct with (nolock)#)"
                     + " SELECT OBJECT_SCHEMA_NAME(source_object_id, DB_ID(?)),"
                     + " OBJECT_NAME(source_object_id, DB_ID(?)),"
                     + " capture_instance,"
@@ -103,7 +99,7 @@ public class SqlServerConnection extends JdbcConnection {
                     + " FROM ordered_change_tables WHERE ct_sequence = 1";
 
     private static final String GET_NEW_CHANGE_TABLES =
-            "SELECT * FROM [#db].cdc.change_tables WHERE start_lsn BETWEEN ? AND ?";
+            "SELECT * FROM [#db].cdc.change_tables with (nolock) WHERE start_lsn BETWEEN ? AND ?";
     private static final String OPENING_QUOTING_CHARACTER = "[";
     private static final String CLOSING_QUOTING_CHARACTER = "]";
 
@@ -177,13 +173,13 @@ public class SqlServerConnection extends JdbcConnection {
             getAllChangesForTableStatement.append(String.join(",", skippedOps));
             getAllChangesForTableStatement.append(
                     ") order by [__$start_lsn] ASC, [__$seqval] ASC, [__$operation] ASC");
-            get_all_changes_for_table = getAllChangesForTableStatement.toString();
+            getAllChangesForTableTemp = getAllChangesForTableStatement.toString();
         } else {
-            get_all_changes_for_table = GET_ALL_CHANGES_FOR_TABLE;
+            getAllChangesForTableTemp = GET_ALL_CHANGES_FOR_TABLE;
         }
 
         getAllChangesForTable =
-                get_all_changes_for_table.replaceFirst(
+                getAllChangesForTableTemp.replaceFirst(
                         STATEMENTS_PLACEHOLDER,
                         Matcher.quoteReplacement(", " + LSN_TIMESTAMP_SELECT_STATEMENT));
         this.config = config;
@@ -473,6 +469,7 @@ public class SqlServerConnection extends JdbcConnection {
         return tableId.schema() + '_' + tableId.table();
     }
 
+    /** 开启CDC的表. */
     public static class CdcEnabledTable {
         private final String tableId;
         private final String captureName;

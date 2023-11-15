@@ -54,6 +54,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             int splitMetaGroupSize,
             double distributionFactorUpper,
             double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
@@ -77,6 +79,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 distributionFactorLower,
                 includeSchemaChanges,
                 closeIdleReaders,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 dbzProperties,
                 dbzConfiguration);
         this.driverClassName = driverClassName;

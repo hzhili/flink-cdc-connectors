@@ -18,7 +18,12 @@ package com.ververica.cdc.connectors.oracle.source.meta.offset;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import com.ververica.cdc.connectors.oracle.source.OracleDialect;
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
+import io.debezium.jdbc.JdbcConnection;
 
+import java.sql.Timestamp;
 import java.util.Map;
 
 /** An offset factory class create {@link RedoLogOffset} instance. */
@@ -26,7 +31,14 @@ public class RedoLogOffsetFactory extends OffsetFactory {
 
     private static final long serialVersionUID = 1L;
 
-    public RedoLogOffsetFactory() {}
+    private final OracleDialect dialect;
+    private final OracleSourceConfig sourceConfig;
+    private static final String TIMESTAMP_TO_LSN = "SELECT timestamp_to_scn(?) from dual";
+
+    public RedoLogOffsetFactory(OracleSourceConfigFactory configFactory, OracleDialect dialect) {
+        this.sourceConfig = configFactory.create(0);
+        this.dialect = dialect;
+    }
 
     @Override
     public Offset newOffset(Map<String, String> offset) {
@@ -47,8 +59,20 @@ public class RedoLogOffsetFactory extends OffsetFactory {
 
     @Override
     public Offset createTimestampOffset(long timestampMillis) {
-        throw new UnsupportedOperationException(
-                "Do not support to create RedoLogOffset by timestamp.");
+        Timestamp timestamp = new Timestamp(timestampMillis);
+        try (JdbcConnection jdbcConnection = dialect.openJdbcConnection(sourceConfig)) {
+            return jdbcConnection.prepareQueryAndMap(
+                    TIMESTAMP_TO_LSN,
+                    ps -> ps.setTimestamp(1, timestamp),
+                    rs -> {
+                        if (rs.next()) {
+                            return new RedoLogOffset(rs.getLong(1));
+                        }
+                        return null;
+                    });
+        } catch (Exception e) {
+            throw new RuntimeException("Read the binlog offset error", e);
+        }
     }
 
     @Override

@@ -18,13 +18,30 @@ package com.ververica.cdc.connectors.sqlserver.source.offset;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
+import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
+import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SourceInfo;
+import io.debezium.jdbc.JdbcConnection;
 
+import java.sql.Timestamp;
 import java.util.Map;
 
 /** A factory to create {@link LsnOffset}. */
 public class LsnFactory extends OffsetFactory {
+    private final SqlServerSourceConfig sourceConfig;
+
+    private final SqlServerDialect dialect;
+
+    private static final String TIMESTAMP_TO_LSN =
+            "SELECT sys.fn_cdc_map_time_to_lsn('smallest greater than or equal',?)";
+
+    public LsnFactory(SqlServerSourceConfigFactory configFactory, SqlServerDialect dialect) {
+        this.sourceConfig = configFactory.create(0);
+        this.dialect = dialect;
+    }
+
     @Override
     public Offset newOffset(Map<String, String> offset) {
         Lsn changeLsn = Lsn.valueOf(offset.get(SourceInfo.CHANGE_LSN_KEY));
@@ -46,7 +63,21 @@ public class LsnFactory extends OffsetFactory {
 
     @Override
     public Offset createTimestampOffset(long timestampMillis) {
-        throw new UnsupportedOperationException("not supported create new Offset by timestamp.");
+        Timestamp timestamp =
+                new Timestamp(timestampMillis);
+        try (JdbcConnection jdbcConnection = dialect.openJdbcConnection(sourceConfig)) {
+            return jdbcConnection.prepareQueryAndMap(
+                    TIMESTAMP_TO_LSN,
+                    ps -> ps.setTimestamp(1, timestamp),
+                    rs -> {
+                        if (rs.next()) {
+                            return new LsnOffset(null, Lsn.valueOf(rs.getBytes(1)), null);
+                        }
+                        return null;
+                    });
+        } catch (Exception e) {
+            throw new RuntimeException("Read the binlog offset error", e);
+        }
     }
 
     @Override

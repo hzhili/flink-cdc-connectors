@@ -106,7 +106,7 @@ public class OracleSourceBuilder<T> {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in Oracle converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.9/connectors/Oracle.html#Oracle-temporal-types
+     * https://debezium.io/documentation/reference/2.2.1/connectors/oracle.html#oracle-temporal-types
      */
     public OracleSourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);
@@ -146,6 +146,34 @@ public class OracleSourceBuilder<T> {
      */
     public OracleSourceBuilder<T> distributionFactorLower(double distributionFactorLower) {
         this.configFactory.distributionFactorLower(distributionFactorLower);
+        return this;
+    }
+
+    /**
+     * The threshold for the row count to trigger sample-based sharding strategy. When the
+     * distribution factor is within the upper and lower bounds, if the approximate row count
+     * exceeds this threshold, the sample-based sharding strategy will be used. This can help to
+     * handle large datasets in a more efficient manner.
+     *
+     * @param sampleShardingThreshold The threshold of row count.
+     * @return This JdbcSourceConfigFactory.
+     */
+    public OracleSourceBuilder sampleShardingThreshold(int sampleShardingThreshold) {
+        this.configFactory.sampleShardingThreshold(sampleShardingThreshold);
+        return this;
+    }
+
+    /**
+     * The inverse of the sampling rate to be used for data sharding based on sampling. The actual
+     * sampling rate is 1 / inverseSamplingRate. For instance, if inverseSamplingRate is 1000, then
+     * the sampling rate is 1/1000, meaning every 1000th record will be included in the sample used
+     * for sharding.
+     *
+     * @param inverseSamplingRate The value representing the inverse of the desired sampling rate.
+     * @return this JdbcSourceConfigFactory instance.
+     */
+    public OracleSourceBuilder inverseSamplingRate(int inverseSamplingRate) {
+        this.configFactory.inverseSamplingRate(inverseSamplingRate);
         return this;
     }
 
@@ -233,8 +261,8 @@ public class OracleSourceBuilder<T> {
      * @return a OracleParallelSource with the settings made for this builder.
      */
     public OracleIncrementalSource<T> build() {
-        this.offsetFactory = new RedoLogOffsetFactory();
         this.dialect = new OracleDialect(configFactory);
+        this.offsetFactory = new RedoLogOffsetFactory(configFactory, dialect);
         return new OracleIncrementalSource<T>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

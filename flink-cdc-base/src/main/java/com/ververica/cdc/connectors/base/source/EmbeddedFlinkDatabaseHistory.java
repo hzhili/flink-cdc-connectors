@@ -102,12 +102,18 @@ public class EmbeddedFlinkDatabaseHistory implements SchemaHistory {
 
     @Override
     public void recover(
-            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+            Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
         for (TableChange tableChange : tableSchemas.values()) {
             schema.overwriteTable(tableChange.getTable());
         }
         listener.recoveryStopped();
+    }
+
+    @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+        offsets.forEach((source, position) -> recover(source, position, schema, ddlParser));
     }
 
     @Override

@@ -34,6 +34,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final double distributionFactorLower;
     protected final boolean includeSchemaChanges;
     protected final boolean closeIdleReaders;
+    protected final int sampleShardingThreshold;
+    protected final int inverseSamplingRate;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -49,6 +51,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             Properties dbzProperties,
             Configuration dbzConfiguration) {
         this.startupOptions = startupOptions;
@@ -60,6 +64,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = dbzProperties;
         this.dbzConfiguration = dbzConfiguration;
+        this.sampleShardingThreshold = sampleShardingThreshold;
+        this.inverseSamplingRate = inverseSamplingRate;
     }
 
     @Override
@@ -93,6 +99,14 @@ public abstract class BaseSourceConfig implements SourceConfig {
     @Override
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    public int getSampleShardingThreshold() {
+        return sampleShardingThreshold;
+    }
+
+    public int getInverseSamplingRate() {
+        return inverseSamplingRate;
     }
 
     public Properties getDbzProperties() {

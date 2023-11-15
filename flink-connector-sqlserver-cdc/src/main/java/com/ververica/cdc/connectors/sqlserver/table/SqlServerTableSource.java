@@ -76,6 +76,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final int connectMaxRetries;
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
+    private final int sampleShardingThreshold;
+    private final int inverseSamplingRate;
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
 
@@ -109,6 +111,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders) {
         this.physicalSchema = physicalSchema;
@@ -132,6 +136,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.connectMaxRetries = connectMaxRetries;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
+        this.sampleShardingThreshold = sampleShardingThreshold;
+        this.inverseSamplingRate = inverseSamplingRate;
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
     }
@@ -179,6 +185,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .connectMaxRetries(connectMaxRetries)
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
+                            .sampleShardingThreshold(sampleShardingThreshold)
+                            .inverseSamplingRate(inverseSamplingRate)
                             .chunkKeyColumn(chunkKeyColumn)
                             .closeIdleReaders(closeIdleReaders)
                             .build();
@@ -239,6 +247,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         connectMaxRetries,
                         distributionFactorUpper,
                         distributionFactorLower,
+                        sampleShardingThreshold,
+                        inverseSamplingRate,
                         chunkKeyColumn,
                         closeIdleReaders);
         source.metadataKeys = metadataKeys;
@@ -276,6 +286,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
+                && Objects.equals(sampleShardingThreshold, that.sampleShardingThreshold)
+                && Objects.equals(inverseSamplingRate, that.inverseSamplingRate)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders);
     }
@@ -304,6 +316,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 chunkKeyColumn,
                 closeIdleReaders);
     }

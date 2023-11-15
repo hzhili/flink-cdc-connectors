@@ -42,21 +42,19 @@ public class DebugTable {
         String sourceDDL =
                 "create catalog sqlCatalog with(\n"
                         + "  'type'='sqlserver-ctl',\n"
-                        + "  'hostname'='192.168.0.242',\n"
+                        + "  'hostname'='192.168.0.2',\n"
                         + "  'port'='1433',\n"
                         + "  'username'='sa',\n"
                         + "  'password'='146-164-156-',\n"
-                        + "  'database-name'='his_new0218',\n"
+                        + "  'database-name'='his_new',\n"
                         + "  'schema-name'='dbo',\n"
                         + "  'enable.metadata.column'='true',\n"
-                        + "  'debezium.database.encrypt'='false',\n"
-                        + "  'debezium.sqlserver.agent.status.query'='SELECT CASE WHEN dss.[status]=4 THEN 1 ELSE 0 END AS isRunning FROM [#db].sys.dm_server_services dss WHERE dss.[servicename] LIKE N''''SQL Server ?????? (%\\'''\n"
+                        + "  'debezium.database.encrypt'='false'\n"
                         + ");";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(
-                        "SELECT * FROM sqlCatalog.HIS_NEW0218.PATINFO_CY /*+OPTIONS('scan.incremental.close-idle-reader.enabled'='true',\n"
-                                + "'scan.incremental.snapshot.chunk.size'='1024',"
-                                + "'scan.startup.mode'='latest-offset')*/ A")
+                        "SELECT * FROM sqlCatalog.his_new.DictMedi /*+OPTIONS('scan.incremental.close-idle-reader.enabled'='true',\n"
+                                + "'scan.incremental.snapshot.chunk.size'='1024')*/ A")
                 .print();
     }
 }

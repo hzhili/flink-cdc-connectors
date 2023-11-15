@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.base.utils;
 
+import org.apache.commons.lang3.math.NumberUtils;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
@@ -35,6 +37,15 @@ public class ObjectUtils {
             return ((BigInteger) number).add(BigInteger.valueOf(augend));
         } else if (number instanceof BigDecimal) {
             return ((BigDecimal) number).add(BigDecimal.valueOf(augend));
+        } else if (number instanceof String) {
+            String minuendStr = (String) number;
+            if (NumberUtils.isCreatable(minuendStr)) {
+                return NumberUtils.createBigDecimal(minuendStr).add(BigDecimal.valueOf(augend));
+            }
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Unsupported type %s for numeric minus.",
+                            number.getClass().getSimpleName()));
         } else {
             throw new UnsupportedOperationException(
                     String.format(
@@ -62,6 +73,17 @@ public class ObjectUtils {
                     ((BigInteger) minuend).subtract((BigInteger) subtrahend).toString());
         } else if (minuend instanceof BigDecimal) {
             return ((BigDecimal) minuend).subtract((BigDecimal) subtrahend);
+        } else if (minuend instanceof String) {
+            String minuendStr = (String) minuend;
+            String subtrahendStr = (String) subtrahend;
+            if (NumberUtils.isCreatable(minuendStr) && NumberUtils.isCreatable(subtrahendStr)) {
+                return NumberUtils.createBigDecimal(minuendStr)
+                        .subtract(NumberUtils.createBigDecimal(subtrahendStr));
+            }
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Unsupported type %s for numeric minus.",
+                            minuend.getClass().getSimpleName()));
         } else {
             throw new UnsupportedOperationException(
                     String.format(
@@ -81,6 +103,20 @@ public class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static int compare(Object obj1, Object obj2) {
+        if (!obj1.getClass().equals(obj2.getClass())) {
+            if (obj1 instanceof String) {
+                obj1 =
+                        NumberUtils.isCreatable((String) obj1)
+                                ? NumberUtils.createBigDecimal((String) obj1)
+                                : obj1;
+            }
+            if (obj2 instanceof String) {
+                obj2 =
+                        NumberUtils.isCreatable((String) obj2)
+                                ? NumberUtils.createBigDecimal((String) obj2)
+                                : obj2;
+            }
+        }
         Comparable<Object> c1 = (Comparable<Object>) obj1;
         Comparable<Object> c2 = (Comparable<Object>) obj2;
         return c1.compareTo(c2);

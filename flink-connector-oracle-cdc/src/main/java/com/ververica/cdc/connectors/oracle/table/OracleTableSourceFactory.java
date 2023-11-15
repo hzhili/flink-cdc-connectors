@@ -38,7 +38,9 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNEC
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.INVERSE_SAMPLING_RATE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
@@ -90,6 +92,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        int sampleShardingThreshold = config.get(SAMPLE_SHARDING_THRESHOLD);
+        int inverseSamplingRate = config.get(INVERSE_SAMPLING_RATE);
         String chunkKeyColumn =
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         String serverTimezone = config.get(SERVER_TIME_ZONE);
@@ -129,6 +133,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 chunkKeyColumn,
                 closeIdlerReaders);
     }
@@ -167,6 +173,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(SAMPLE_SHARDING_THRESHOLD);
+        options.add(INVERSE_SAMPLING_RATE);
         return options;
     }
 

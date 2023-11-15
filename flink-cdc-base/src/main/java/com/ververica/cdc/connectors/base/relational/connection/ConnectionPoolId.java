@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -27,10 +29,22 @@ public class ConnectionPoolId implements Serializable {
     private final int port;
     private final String username;
 
-    public ConnectionPoolId(String host, int port, String username) {
+    @Nullable private final String database;
+
+    /** the identifier of a data source pool factory is its class name. */
+    private final String dataSourcePoolFactoryIdentifier;
+
+    public ConnectionPoolId(
+            String host,
+            int port,
+            String username,
+            @Nullable String database,
+            String dataSourcePoolFactoryIdentifier) {
         this.host = host;
         this.port = port;
         this.username = username;
+        this.database = database;
+        this.dataSourcePoolFactoryIdentifier = dataSourcePoolFactoryIdentifier;
     }
 
     @Override
@@ -44,16 +58,31 @@ public class ConnectionPoolId implements Serializable {
         ConnectionPoolId that = (ConnectionPoolId) o;
         return Objects.equals(host, that.host)
                 && Objects.equals(port, that.port)
-                && Objects.equals(username, that.username);
+                && Objects.equals(username, that.username)
+                && Objects.equals(database, that.database)
+                && Objects.equals(
+                        dataSourcePoolFactoryIdentifier, that.dataSourcePoolFactoryIdentifier);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(host, port, username);
+        return Objects.hash(host, port, username, database, dataSourcePoolFactoryIdentifier);
     }
 
     @Override
     public String toString() {
-        return username + '@' + host + ':' + port;
+        return username
+                + '@'
+                + host
+                + ':'
+                + port
+                + ", database="
+                + database
+                + ", dataSourcePoolFactoryIdentifier="
+                + dataSourcePoolFactoryIdentifier;
+    }
+
+    public String getDataSourcePoolFactoryIdentifier() {
+        return dataSourcePoolFactoryIdentifier;
     }
 }

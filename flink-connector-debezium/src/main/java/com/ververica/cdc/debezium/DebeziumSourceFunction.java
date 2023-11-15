@@ -28,7 +28,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
-import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.OperatorMetricGroup;
+import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -60,7 +61,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Properties;
@@ -101,7 +101,7 @@ import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.retrieveHistory
  * <p>Note: currently, the source function can't run in multiple parallel instances.
  *
  * <p>Please refer to Debezium's documentation for the available configuration properties:
- * https://debezium.io/documentation/reference/1.5/development/engine.html#engine-properties
+ * https://debezium.io/documentation/reference/2.2.1/development/engine.html#engine-properties
  */
 @PublicEvolving
 public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
@@ -367,16 +367,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void run(SourceContext<T> sourceContext) throws Exception {
-        properties.setProperty("name", "engine");
+        properties.putIfAbsent("name", "engine");
         properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
         if (restoredOffsetState != null) {
             // restored from state
             properties.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
         }
         // DO NOT include schema change, e.g. DDL
-        properties.setProperty("include.schema.changes", "false");
+        properties.putIfAbsent("include.schema.changes", "false");
         // disable the offset flush totally
-        properties.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
+        properties.putIfAbsent("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         properties.setProperty("tombstones.on.delete", "false");
         if (engineInstanceName == null) {
@@ -408,7 +408,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         handover);
 
         // create the engine with this configuration ...
-
         this.engine =
                 DebeziumEngine.create(Connect.class)
                         .using(properties)
@@ -430,22 +429,19 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         debeziumStarted = true;
 
         // initialize metrics
-        // make RuntimeContext#getMetricGroup compatible between Flink 1.13 and Flink 1.14
-        final Method getMetricGroupMethod =
-                getRuntimeContext().getClass().getMethod("getMetricGroup");
-        getMetricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup =
-                (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
-
+        OperatorMetricGroup metricGroup = getRuntimeContext().getMetricGroup();
         metricGroup.gauge(
-                "currentFetchEventTimeLag",
+                MetricNames.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getFetchDelay());
         metricGroup.gauge(
-                "currentEmitEventTimeLag",
+                MetricNames.CURRENT_EMIT_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getEmitDelay());
         metricGroup.gauge(
-                "sourceIdleTime", (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
-
+                MetricNames.SOURCE_IDLE_TIME,
+                (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
+        metricGroup.gauge(
+                MetricNames.NUM_RECORDS_IN_ERRORS,
+                (Gauge<Long>) () -> debeziumChangeFetcher.getNumRecordInErrors());
         // start the real debezium consumer
         try {
             debeziumChangeFetcher.runFetchLoop();

@@ -119,15 +119,6 @@ public class OracleConnectionUtils {
             LOG.warn(" SQL execute error, sql:{}", queryTablesSql, e);
         }
 
-        //        for (TableId tableId : tableIdSet) {
-        //            if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-        //                capturedTableIds.add(tableId);
-        //                LOG.info("\t including '{}' for further processing", tableId);
-        //            } else {
-        //                LOG.debug("\t '{}' is filtered out of capturing", tableId);
-        //            }
-        //        }
-
         return capturedTableIds;
     }
 }

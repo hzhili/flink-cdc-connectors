@@ -109,6 +109,8 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         false);
         assertEquals(expectedSource, actualSource);
@@ -150,6 +152,8 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         40.5d,
                         0.01d,
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         "testCol",
                         true);
         assertEquals(expectedSource, actualSource);
@@ -190,6 +194,8 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         "testCol",
                         true);
         assertEquals(expectedSource, actualSource);
@@ -229,6 +235,8 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         false);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();

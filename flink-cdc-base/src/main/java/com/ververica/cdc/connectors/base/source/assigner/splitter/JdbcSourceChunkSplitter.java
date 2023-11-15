@@ -122,7 +122,11 @@ public interface JdbcSourceChunkSplitter extends ChunkSplitter {
         // DECIMAL
         return typeRoot == LogicalTypeRoot.BIGINT
                 || typeRoot == LogicalTypeRoot.INTEGER
-                || typeRoot == LogicalTypeRoot.DECIMAL;
+                || typeRoot == LogicalTypeRoot.DECIMAL
+                || typeRoot == LogicalTypeRoot.SMALLINT
+                || typeRoot == LogicalTypeRoot.TINYINT
+                || typeRoot == LogicalTypeRoot.VARCHAR
+                || typeRoot == LogicalTypeRoot.CHAR;
     }
 
     /**

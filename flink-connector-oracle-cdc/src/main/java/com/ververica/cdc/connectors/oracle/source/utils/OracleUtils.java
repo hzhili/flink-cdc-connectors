@@ -31,12 +31,19 @@ import io.debezium.relational.TableId;
 import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,6 +52,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rowToArr
 
 /** Utils to prepare Oracle SQL statement. */
 public class OracleUtils {
+    public static final Logger LOG = LoggerFactory.getLogger(OracleUtils.class);
 
     private OracleUtils() {}
 
@@ -110,6 +118,56 @@ public class OracleUtils {
                     }
                     return rs.getObject(1);
                 });
+    }
+
+    public static Object[] skipReadAndSortSampleData(
+            JdbcConnection jdbc, TableId tableId, String columnName, int inverseSamplingRate)
+            throws SQLException {
+        final String sampleQuery =
+                String.format("SELECT %s FROM %s", quote(columnName), quoteSchemaAndTable(tableId));
+
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        List<Object> results = new ArrayList<>();
+        try {
+            stmt =
+                    jdbc.connection()
+                            .createStatement(
+                                    ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+            stmt.setFetchSize(Integer.MIN_VALUE);
+            rs = stmt.executeQuery(sampleQuery);
+
+            int count = 0;
+            while (rs.next()) {
+                count++;
+                if (count % 100000 == 0) {
+                    LOG.info("Processing row index: {}", count);
+                }
+                if (count % inverseSamplingRate == 0) {
+                    results.add(rs.getObject(1));
+                }
+            }
+        } finally {
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOG.error("Failed to close ResultSet", e);
+                }
+            }
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    LOG.error("Failed to close Statement", e);
+                }
+            }
+        }
+        Object[] resultsArray = results.toArray();
+        Arrays.sort(resultsArray);
+        return resultsArray;
     }
 
     public static Object queryNextChunkMax(

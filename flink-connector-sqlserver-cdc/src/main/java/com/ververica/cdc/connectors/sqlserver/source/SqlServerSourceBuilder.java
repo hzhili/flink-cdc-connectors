@@ -133,6 +133,34 @@ public class SqlServerSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * The threshold for the row count to trigger sample-based sharding strategy. When the
+     * distribution factor is within the upper and lower bounds, if the approximate row count
+     * exceeds this threshold, the sample-based sharding strategy will be used. This can help to
+     * handle large datasets in a more efficient manner.
+     *
+     * @param sampleShardingThreshold The threshold of row count.
+     * @return This JdbcSourceConfigFactory.
+     */
+    public SqlServerSourceBuilder sampleShardingThreshold(int sampleShardingThreshold) {
+        this.configFactory.sampleShardingThreshold(sampleShardingThreshold);
+        return this;
+    }
+
+    /**
+     * The inverse of the sampling rate to be used for data sharding based on sampling. The actual
+     * sampling rate is 1 / inverseSamplingRate. For instance, if inverseSamplingRate is 1000, then
+     * the sampling rate is 1/1000, meaning every 1000th record will be included in the sample used
+     * for sharding.
+     *
+     * @param inverseSamplingRate The value representing the inverse of the desired sampling rate.
+     * @return this JdbcSourceConfigFactory instance.
+     */
+    public SqlServerSourceBuilder inverseSamplingRate(int inverseSamplingRate) {
+        this.configFactory.inverseSamplingRate(inverseSamplingRate);
+        return this;
+    }
+
     /** The maximum fetch size for per poll when read table snapshot. */
     public SqlServerSourceBuilder<T> fetchSize(int fetchSize) {
         this.configFactory.fetchSize(fetchSize);
@@ -218,8 +246,9 @@ public class SqlServerSourceBuilder<T> {
      * @return a SqlSeverParallelSource with the settings made for this builder.
      */
     public SqlServerIncrementalSource<T> build() {
-        this.offsetFactory = new LsnFactory();
+
         this.dialect = new SqlServerDialect(configFactory);
+        this.offsetFactory = new LsnFactory(configFactory, dialect);
         return new SqlServerIncrementalSource<T>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 
 import java.time.Duration;
 import java.util.List;
@@ -40,6 +39,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             int splitMetaGroupSize,
             double distributionFactorUpper,
             double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
@@ -64,6 +65,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 splitMetaGroupSize,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 includeSchemaChanges,
                 closeIdleReaders,
                 dbzProperties,
@@ -84,13 +87,5 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
     @Override
     public SqlServerConnectorConfig getDbzConnectorConfig() {
         return new SqlServerConnectorConfig(getDbzConfiguration());
-    }
-
-    public Configuration getOriginDbzConnectorConfig() {
-        return super.getDbzConfiguration();
-    }
-
-    public RelationalTableFilters getTableFilters() {
-        return getDbzConnectorConfig().getTableFilters();
     }
 }

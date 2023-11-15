@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.debezium;
 
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import io.debezium.config.Configuration;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.ddl.DdlParser;
@@ -98,6 +99,15 @@ public class EmbeddedFlinkDatabaseHistory implements SchemaHistory {
                 new HistoryRecord(
                         source, position, databaseName, schemaName, ddl, changes, timestamp);
         listener.onChangeApplied(record);
+    }
+
+    @Override
+    public void recover(Offsets<?, ?> offsets, Tables schema, DdlParser ddlParser) {
+        listener.recoveryStarted();
+        for (TableChange tableChange : tableSchemas.values()) {
+            schema.overwriteTable(tableChange.getTable());
+        }
+        listener.recoveryStopped();
     }
 
     @Override

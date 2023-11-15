@@ -16,22 +16,17 @@
 
 package com.ververica.cdc.connectors.base.source.metrics;
 
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
-import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
+import org.apache.flink.runtime.metrics.MetricNames;
 
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 /** A collection class for handling metrics in {@link IncrementalSourceReader}. */
 public class SourceReaderMetrics {
 
-    private final MetricGroup metricGroup;
-
-    /**
-     * The last record processing time, which is updated after {@link IncrementalSourceReader}
-     * fetches a batch of data. It's mainly used to report metrics sourceIdleTime for sourceIdleTime
-     * = System.currentTimeMillis() - processTime.
-     */
-    private volatile long processTime = 0L;
+    private final SourceReaderMetricGroup metricGroup;
 
     /**
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
@@ -39,52 +34,28 @@ public class SourceReaderMetrics {
      */
     private volatile long fetchDelay = 0L;
 
-    /**
-     * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
-     * source operator.
-     */
-    private volatile long emitDelay = 0L;
+    /** The total number of record that failed to consume, process or emit. */
+    private final Counter numRecordsInErrorsCounter;
 
-    public SourceReaderMetrics(MetricGroup metricGroup) {
+    public SourceReaderMetrics(SourceReaderMetricGroup metricGroup) {
         this.metricGroup = metricGroup;
+        this.numRecordsInErrorsCounter = metricGroup.getNumRecordsInErrorsCounter();
     }
 
     public void registerMetrics() {
         metricGroup.gauge(
-                SourceReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
-                (Gauge<Long>) this::getFetchDelay);
-        metricGroup.gauge(
-                SourceReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
-                (Gauge<Long>) this::getEmitDelay);
-        metricGroup.gauge(
-                SourceReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
+                MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
     }
 
     public long getFetchDelay() {
         return fetchDelay;
     }
 
-    public long getEmitDelay() {
-        return emitDelay;
-    }
-
-    public long getIdleTime() {
-        // no previous process time at the beginning, return 0 as idle time
-        if (processTime == 0) {
-            return 0;
-        }
-        return System.currentTimeMillis() - processTime;
-    }
-
-    public void recordProcessTime(long processTime) {
-        this.processTime = processTime;
-    }
-
     public void recordFetchDelay(long fetchDelay) {
         this.fetchDelay = fetchDelay;
     }
 
-    public void recordEmitDelay(long emitDelay) {
-        this.emitDelay = emitDelay;
+    public void addNumRecordsInErrors(long delta) {
+        this.numRecordsInErrorsCounter.inc(delta);
     }
 }

@@ -125,6 +125,13 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         return OracleUtils.queryMin(jdbc, tableId, columnName, excludedLowerBound);
     }
 
+    public Object[] sampleDataFromColumn(
+            JdbcConnection jdbc, TableId tableId, String columnName, int inverseSamplingRate)
+            throws SQLException {
+        return OracleUtils.skipReadAndSortSampleData(
+                jdbc, tableId, columnName, inverseSamplingRate);
+    }
+
     @Override
     public Object queryNextChunkMax(
             JdbcConnection jdbc,
@@ -176,7 +183,18 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         final int chunkSize = sourceConfig.getSplitSize();
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
         final double distributionFactorLower = sourceConfig.getDistributionFactorLower();
-
+        final int sampleShardingThreshold = sourceConfig.getSampleShardingThreshold();
+        LOG.info(
+                "Splitting table {} into chunks, split column: {}, min: {}, max: {}, chunk size: {}, "
+                        + "distribution factor upper: {}, distribution factor lower: {}, sample sharding threshold: {}",
+                tableId,
+                splitColumnName,
+                min,
+                max,
+                chunkSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                sampleShardingThreshold);
         // use ROWID get splitUnevenlySizedChunks by default
         if (splitColumn.name().equals(ROWID.class.getSimpleName())) {
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
@@ -197,12 +215,80 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
                 return splitEvenlySizedChunks(
                         tableId, min, max, approximateRowCnt, dynamicChunkSize);
             } else {
+                int shardCount = (int) (approximateRowCnt / chunkSize);
+                int inverseSamplingRate = sourceConfig.getInverseSamplingRate();
+                if (sampleShardingThreshold < shardCount) {
+                    // It is necessary to ensure that the number of data rows sampled by the
+                    // sampling rate is greater than the number of shards.
+                    // Otherwise, if the sampling rate is too low, it may result in an insufficient
+                    // number of data rows for the shards, leading to an inadequate number of
+                    // shards.
+                    // Therefore, inverseSamplingRate should be less than chunkSize
+                    if (inverseSamplingRate > chunkSize) {
+                        LOG.warn(
+                                "The inverseSamplingRate is {}, which is greater than chunkSize {}, so we set inverseSamplingRate to chunkSize",
+                                inverseSamplingRate,
+                                chunkSize);
+                        inverseSamplingRate = chunkSize;
+                    }
+                    LOG.info(
+                            "Use sampling sharding for table {}, the sampling rate is {}",
+                            tableId,
+                            inverseSamplingRate);
+                    Object[] sample =
+                            sampleDataFromColumn(
+                                    jdbc, tableId, splitColumnName, inverseSamplingRate);
+                    LOG.info(
+                            "Sample data from table {} end, the sample size is {}",
+                            tableId,
+                            sample.length);
+                    return efficientShardingThroughSampling(
+                            tableId, sample, approximateRowCnt, shardCount);
+                }
                 return splitUnevenlySizedChunks(
                         jdbc, tableId, splitColumnName, min, max, chunkSize);
             }
         } else {
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
         }
+    }
+
+    protected List<ChunkRange> efficientShardingThroughSampling(
+            TableId tableId, Object[] sampleData, long approximateRowCnt, int shardCount) {
+        LOG.info(
+                "Use efficient sharding through sampling optimization for table {}, the approximate row count is {}, the shardCount is {}",
+                tableId,
+                approximateRowCnt,
+                shardCount);
+
+        final List<ChunkRange> splits = new ArrayList<>();
+
+        if (shardCount == 0) {
+            splits.add(ChunkRange.of(null, null));
+            return splits;
+        }
+
+        double approxSamplePerShard = (double) sampleData.length / shardCount;
+
+        if (approxSamplePerShard <= 1) {
+
+            splits.add(ChunkRange.of(null, sampleData[0]));
+            for (int i = 0; i < sampleData.length - 1; i++) {
+                splits.add(ChunkRange.of(sampleData[i], sampleData[i + 1]));
+            }
+            splits.add(ChunkRange.of(sampleData[sampleData.length - 1], null));
+        } else {
+            // Calculate the shard boundaries
+            for (int i = 0; i < shardCount; i++) {
+                Object chunkStart = i == 0 ? null : sampleData[(int) (i * approxSamplePerShard)];
+                Object chunkEnd =
+                        i < shardCount - 1
+                                ? sampleData[(int) ((i + 1) * approxSamplePerShard)]
+                                : null;
+                splits.add(ChunkRange.of(chunkStart, chunkEnd));
+            }
+        }
+        return splits;
     }
 
     /**

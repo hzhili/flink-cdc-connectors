@@ -37,6 +37,7 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A Handler that convert change messages from {@link DebeziumEngine} to data in Flink. Considering
@@ -99,6 +100,9 @@ public class DebeziumChangeFetcher<T> {
      * source operator.
      */
     private volatile long emitDelay = 0L;
+
+    /** The number of records that failed to parse or deserialize. */
+    private volatile AtomicLong numRecordInErrors = new AtomicLong(0);
 
     // ------------------------------------------------------------------------
 
@@ -207,6 +211,10 @@ public class DebeziumChangeFetcher<T> {
         return System.currentTimeMillis() - processTime;
     }
 
+    public long getNumRecordInErrors() {
+        return numRecordInErrors.get();
+    }
+
     // ---------------------------------------------------------------------------------------
     // Helper
     // ---------------------------------------------------------------------------------------
@@ -232,8 +240,13 @@ public class DebeziumChangeFetcher<T> {
                 // drop heartbeat events
                 continue;
             }
-
-            deserialization.deserialize(record, debeziumCollector);
+            try {
+                deserialization.deserialize(record, debeziumCollector);
+            } catch (Throwable t) {
+                numRecordInErrors.incrementAndGet();
+                LOG.error("Failed to deserialize record {}", record, t);
+                throw t;
+            }
 
             if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");

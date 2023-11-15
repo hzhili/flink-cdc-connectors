@@ -38,9 +38,11 @@ import java.util.stream.Collectors;
 
 /**
  * Copied from Debezium project(2.2.1.final) to add method {@link
- * SqlServerStreamingChangeEventSource#afterHandleLsn(SqlServerPartition, SqlServerOffsetContext)}.
- * Also implemented {@link SqlServerStreamingChangeEventSource#execute( ChangeEventSourceContext,
- * SqlServerPartition, SqlServerOffsetContext)}.
+ * SqlServerStreamingChangeEventSource#afterHandleLsn(SqlServerPartition, Lsn)}. Also implemented
+ * {@link SqlServerStreamingChangeEventSource#execute( ChangeEventSourceContext, SqlServerPartition,
+ * SqlServerOffsetContext)}. A {@link StreamingChangeEventSource} based on SQL Server change data
+ * capture functionality. A main loop polls database DDL change and change data tables and turns
+ * them into change events.
  *
  * <p>A {@link StreamingChangeEventSource} based on SQL Server change data capture functionality. A
  * main loop polls database DDL change and change data tables and turns them into change events.
@@ -204,7 +206,6 @@ public class SqlServerStreamingChangeEventSource
 
             if (context.isRunning()) {
                 commitTransaction();
-                afterHandleLsn(partition, offsetContext);
                 final Lsn toLsn =
                         getToLsn(
                                 dataConnection,
@@ -472,6 +473,8 @@ public class SqlServerStreamingChangeEventSource
                             TxLogPosition.valueOf(toLsn));
                     // Terminate the transaction otherwise CDC could not be disabled for tables
                     dataConnection.rollback();
+                    // Determine whether to continue streaming in sqlserver cdc snapshot phase
+                    afterHandleLsn(partition, toLsn);
                 } catch (SQLException e) {
                     tablesSlot.set(
                             processErrorFromChangeTableQuery(databaseName, e, tablesSlot.get()));
@@ -650,8 +653,7 @@ public class SqlServerStreamingChangeEventSource
     }
 
     /** expose control to the user to stop the connector. */
-    protected void afterHandleLsn(
-            SqlServerPartition partition, SqlServerOffsetContext offsetContext) {
+    protected void afterHandleLsn(SqlServerPartition partition, Lsn toLsn) {
         // do nothing
     }
 }

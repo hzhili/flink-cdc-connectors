@@ -36,10 +36,16 @@ import io.debezium.relational.TableId;
 import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -53,6 +59,7 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** The utils for SqlServer data source. */
 public class SqlServerUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(SqlServerUtils.class);
 
     public SqlServerUtils() {}
 
@@ -119,6 +126,56 @@ public class SqlServerUtils {
                     }
                     return rs.getObject(1);
                 });
+    }
+
+    public static Object[] skipReadAndSortSampleData(
+            JdbcConnection jdbc, TableId tableId, String columnName, int inverseSamplingRate)
+            throws SQLException {
+        final String sampleQuery =
+                String.format("SELECT %s FROM %s", quote(columnName), quote(tableId));
+
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        List<Object> results = new ArrayList<>();
+        try {
+            stmt =
+                    jdbc.connection()
+                            .createStatement(
+                                    ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+            //            stmt.setFetchSize(Integer.MIN_VALUE);
+            rs = stmt.executeQuery(sampleQuery);
+
+            int count = 0;
+            while (rs.next()) {
+                count++;
+                if (count % 100000 == 0) {
+                    LOG.info("Processing row index: {}", count);
+                }
+                if (count % inverseSamplingRate == 0) {
+                    results.add(rs.getObject(1));
+                }
+            }
+        } finally {
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOG.error("Failed to close ResultSet", e);
+                }
+            }
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    LOG.error("Failed to close Statement", e);
+                }
+            }
+        }
+        Object[] resultsArray = results.toArray();
+        Arrays.sort(resultsArray);
+        return resultsArray;
     }
 
     /**
@@ -202,6 +259,44 @@ public class SqlServerUtils {
         try {
             Lsn maxLsn = connection.getMaxTransactionLsn(connection.database());
             return new LsnOffset(maxLsn, maxLsn, null);
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(e.getMessage(), e);
+        }
+    }
+
+    /** Fetch current largest log sequence number (LSN) of the table. */
+    public static LsnOffset currentLsn(SqlServerConnection connection, TableId tableId) {
+        try {
+            List<String> captureInstances = new ArrayList<>();
+            connection.prepareQuery(
+                    "select capture_instance from cdc.change_tables where source_object_id=object_id(?)",
+                    ps -> ps.setString(1, tableId.table()),
+                    rs -> {
+                        while (rs.next()) {
+                            captureInstances.add(rs.getString(1));
+                        }
+                    });
+            List<Lsn> lens = new ArrayList<>();
+            for (String captureInstance : captureInstances) {
+                String query = "select max(__$start_lsn) from cdc." + captureInstance + "_ct";
+                connection.query(
+                        query,
+                        rs -> {
+                            if (rs.next()) {
+                                lens.add(Lsn.valueOf(rs.getBytes(1)));
+                            }
+                        });
+            }
+            return lens.stream()
+                    .map(lsn -> new LsnOffset(lsn, lsn, null))
+                    .reduce(
+                            (lsnOffset, lsnOffset2) -> {
+                                if (lsnOffset.isAfter(lsnOffset2)) {
+                                    return lsnOffset;
+                                }
+                                return lsnOffset2;
+                            })
+                    .orElseGet(() -> new LsnOffset(null, null, null));
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
         }

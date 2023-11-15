@@ -111,4 +111,24 @@ public class JdbcSourceOptions extends SourceOptions {
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key and the chunk key is the RowId in oracle."
                                     + "This column must be a column of the primary key.");
+    public static final ConfigOption<Integer> SAMPLE_SHARDING_THRESHOLD =
+            ConfigOptions.key("sample-sharding.threshold")
+                    .intType()
+                    .defaultValue(1000) // 1000 shards
+                    .withDescription(
+                            "The threshold of estimated shard count to trigger the sample sharding strategy. "
+                                    + "When the distribution factor is outside the upper and lower bounds, "
+                                    + "and if the estimated shard count (approximateRowCnt/chunkSize) exceeds this threshold, "
+                                    + "the sample sharding strategy will be used. "
+                                    + "This strategy can help to handle large datasets more efficiently. "
+                                    + "The default value is 1000 shards.");
+    public static final ConfigOption<Integer> INVERSE_SAMPLING_RATE =
+            ConfigOptions.key("inverse-sampling.rate")
+                    .intType()
+                    .defaultValue(1000) // 1/1000 sampling rate
+                    .withDescription(
+                            "The inverse of the sampling rate for the sample sharding strategy. "
+                                    + "The value represents the denominator of the sampling rate fraction. "
+                                    + "For example, a value of 1000 means a sampling rate of 1/1000. "
+                                    + "This parameter is used when the sample sharding strategy is triggered.");
 }

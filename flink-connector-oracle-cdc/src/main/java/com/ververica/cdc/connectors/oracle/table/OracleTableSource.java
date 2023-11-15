@@ -51,7 +51,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@link DynamicTableSource} that describes how to create a Oracle binlog from a logical
+ * A {@link DynamicTableSource} that describes how to create a Oracle redo log from a logical
  * description.
  */
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
@@ -76,6 +76,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final int connectMaxRetries;
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
+    private final int sampleShardingThreshold;
+    private final int inverseSamplingRate;
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
 
@@ -110,6 +112,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders) {
         this.physicalSchema = physicalSchema;
@@ -134,6 +138,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.connectionPoolSize = connectionPoolSize;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
+        this.sampleShardingThreshold = sampleShardingThreshold;
+        this.inverseSamplingRate = inverseSamplingRate;
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
     }
@@ -182,6 +188,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .connectMaxRetries(connectMaxRetries)
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
+                            .sampleShardingThreshold(sampleShardingThreshold)
+                            .inverseSamplingRate(inverseSamplingRate)
                             .closeIdleReaders(closeIdleReaders)
                             .build();
 
@@ -246,6 +254,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
+                        sampleShardingThreshold,
+                        inverseSamplingRate,
                         chunkKeyColumn,
                         closeIdleReaders);
         source.metadataKeys = metadataKeys;
@@ -284,6 +294,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
+                && Objects.equals(sampleShardingThreshold, that.sampleShardingThreshold)
+                && Objects.equals(inverseSamplingRate, that.inverseSamplingRate)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders);
     }
@@ -313,6 +325,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 chunkKeyColumn,
                 closeIdleReaders);
     }

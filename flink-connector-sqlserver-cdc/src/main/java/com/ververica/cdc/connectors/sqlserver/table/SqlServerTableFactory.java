@@ -37,6 +37,8 @@ import java.util.Set;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.INVERSE_SAMPLING_RATE;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
@@ -106,6 +108,12 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
                                     + "\"initial\", \"initial-only\", \"latest-offset\"");
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMPS =
+            ConfigOptions.key("scan.startup.timestamps")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Timestamp for the startup offsets, as milliseconds from epoch.");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -134,6 +142,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        int sampleShardingThreshold = config.get(SAMPLE_SHARDING_THRESHOLD);
+        int inverseSamplingRate = config.get(INVERSE_SAMPLING_RATE);
         String chunkKeyColumn =
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
@@ -170,6 +180,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 connectMaxRetries,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 chunkKeyColumn,
                 closeIdleReaders);
     }
@@ -207,11 +219,16 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(SAMPLE_SHARDING_THRESHOLD);
+        options.add(INVERSE_SAMPLING_RATE);
+        options.add(SCAN_STARTUP_TIMESTAMPS);
         return options;
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMPS = "timestamps";
+    private static final String SCAN_STARTUP_MODE_VALUE_EARLIEST = "earliest-offset";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -219,10 +236,12 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         switch (modeString.toLowerCase()) {
             case SCAN_STARTUP_MODE_VALUE_INITIAL:
                 return StartupOptions.initial();
-
+            case SCAN_STARTUP_MODE_VALUE_EARLIEST:
+                return StartupOptions.earliest();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
-
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMPS:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMPS));
             default:
                 throw new ValidationException(
                         String.format(
@@ -230,6 +249,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMPS,
+                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
                                 modeString));
         }
     }

@@ -118,6 +118,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED
                                 .defaultValue());
@@ -154,6 +156,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
@@ -193,6 +197,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
@@ -257,6 +263,8 @@ public class OracleTableSourceFactoryTest {
                         connectPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         true);
         assertEquals(expectedSource, actualSource);
@@ -293,6 +301,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
@@ -329,6 +339,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
@@ -369,6 +381,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
+                        JdbcSourceOptions.SAMPLE_SHARDING_THRESHOLD.defaultValue(),
+                        JdbcSourceOptions.INVERSE_SAMPLING_RATE.defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();

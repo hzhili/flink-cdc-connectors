@@ -174,7 +174,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                                     "Read snapshot for mysql split %s fail",
                                                     currentSnapshotSplit)));
                         }
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         setReadException(e);
                     }
                 });
@@ -224,9 +224,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         statefulTaskContext.getOffsetContext().getOffset(),
-                        statefulTaskContext
-                                .getTopicNamingStrategy()
-                                .dataChangeTopic(currentSnapshotSplit.getTableId()),
+                        statefulTaskContext.getTopicNamingStrategy().schemaChangeTopic(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 backFillBinlogSplit,
